@@ -1,9 +1,159 @@
-import { PlaywrightCrawler } from '@crawlee/playwright'; import { Actor, log } from 'apify';
-import { normalizeInput } from './input.js'; import { captureGraphqlResponse, inspectGraphqlResponse, inspectLiveFeedShapes, type GraphqlCapture } from './graphql.js'; import { sessionsFromEbayLiveFeed, sessionsFromJson } from './parser.js'; import type { ActorInput, LiveSession } from './types.js';
-await Actor.init(); const input = normalizeInput(await Actor.getInput<ActorInput>()); const sessions = new Map<string, LiveSession>(); const failed: string[] = []; const graphqlCaptures = new Map<string, Promise<GraphqlCapture | null>[]>();
-const defaultUrl = `https://www.ebay.com/ebaylive/`; const urls = input.startUrls.length ? input.startUrls : [defaultUrl]; const sources = [...urls.map((url) => ({ url, userData: { source: url } })), ...input.searchQueries.map((q) => ({ url: defaultUrl, uniqueKey: `query:${q}`, userData: { source: q } }))];
+import { PlaywrightCrawler } from '@crawlee/playwright';
+import { Actor, log } from 'apify';
+
+import { captureGraphqlResponse, inspectGraphqlResponse, inspectLiveFeedShapes, type GraphqlCapture } from './graphql.js';
+import { normalizeInput } from './input.js';
+import { sessionsFromEbayLiveFeed, sessionsFromJson } from './parser.js';
+import { parsePublicProfileText } from './profile.js';
+import type { ActorInput, Lead, LiveSession, PublicProfileStats } from './types.js';
+
+await Actor.init();
+
+const input = normalizeInput(await Actor.getInput<ActorInput>());
+const sessions = new Map<string, LiveSession>();
+const profileStats = new Map<string, PublicProfileStats>();
+const failedSources: string[] = [];
+const failedProfiles: string[] = [];
+const graphqlCaptures = new Map<string, Promise<GraphqlCapture | null>[]>();
+const defaultUrl = 'https://www.ebay.com/ebaylive/';
+const sourceUrls = input.startUrls.length ? input.startUrls : [defaultUrl];
+const sources = [
+    ...sourceUrls.map((url) => ({ url, userData: { source: url } })),
+    ...input.searchQueries.map((query) => ({ url: defaultUrl, uniqueKey: `query:${query}`, userData: { source: query } })),
+];
 const requestKey = (request: { id?: string; uniqueKey: string }) => request.id ?? request.uniqueKey;
-const crawler = new PlaywrightCrawler({ maxConcurrency: input.maxConcurrency, maxRequestRetries: input.maxRequestRetries, navigationTimeoutSecs: input.navigationTimeoutSecs, requestHandlerTimeoutSecs: input.navigationTimeoutSecs + 30, proxyConfiguration: (input.proxyConfiguration.useApifyProxy || input.proxyConfiguration.proxyUrls) ? await Actor.createProxyConfiguration(input.proxyConfiguration) : undefined, preNavigationHooks: [async ({ page, request }) => { const captures: Promise<GraphqlCapture | null>[] = []; page.on('response', (response) => { if (!/\/d\/graphql(?:\?|$)/i.test(response.url())) return; captures.push(captureGraphqlResponse(response).catch(() => null)); }); graphqlCaptures.set(requestKey(request), captures); }], requestHandler: async ({ page, request }) => { await page.waitForTimeout(4_000); const captures = graphqlCaptures.get(requestKey(request)) ?? []; const graphql = (await Promise.all(captures)).filter((item): item is GraphqlCapture => item !== null); const scriptJson = await page.locator('script[type="application/ld+json"],script#__NEXT_DATA__').allTextContents(); const parsed = [...scriptJson.flatMap((json) => { try { return sessionsFromJson(JSON.parse(json), request.loadedUrl ?? request.url); } catch { return []; } }), ...graphql.flatMap((capture) => sessionsFromEbayLiveFeed(capture.response))].slice(0, input.maxLiveSessions); for (const session of parsed) { if (!input.includeEndedLives && session.status === 'ENDED') continue; sessions.set(`${session.host_id}:${session.live_url}`, session); } const operations = graphql.map((capture) => ({ operation_name: capture.operation_name, variable_keys: capture.variable_keys, signals: inspectGraphqlResponse(capture.response), live_feed_shapes: inspectLiveFeedShapes(capture.response) })); await Actor.setValue(`GRAPHQL_${request.id ?? request.uniqueKey}`, operations); log.info('Processed live source', { source: request.userData.source, sessions: sessions.size, graphqlOperations: operations.map(({ operation_name, variable_keys }) => ({ operation_name, variable_keys })) }); }, failedRequestHandler: ({ request }) => { failed.push(request.url); graphqlCaptures.delete(requestKey(request)); } });
-await crawler.run(sources); const grouped = new Map<string, LiveSession[]>(); for (const session of sessions.values()) { const group = grouped.get(session.host_id) ?? []; group.push(session); grouped.set(session.host_id, group); }
-const now = new Date().toISOString(); const leads = [...grouped.values()].map((group) => { const first = group[0]; const followers = Math.max(...group.map((x) => x.follower_count ?? 0)); const statuses = [...new Set(group.map((x) => x.status))]; const score = Math.min(100, Math.round(Math.log10(followers + 1) * 25) + Math.min(30, group.length * 5) + (statuses.includes('LIVE') ? 25 : statuses.includes('UPCOMING') ? 15 : 0)); return { record_type: 'ebay_live_host_lead', schema_version: '1.0', platform: 'ebay_live', seller_id: first.host_id, seller_name: first.host_name, seller_username: first.host_id, profile_url: first.profile_url, seller_country: first.seller_country, seller_country_code: first.seller_country_code, items_sold: null, items_listed: null, follower_count: followers || null, live_session_count: group.length, live_status: statuses, next_live_at: group.filter((x) => x.status === 'UPCOMING').map((x) => x.starts_at).filter(Boolean).sort()[0] ?? null, categories: [...new Set(group.map((x) => x.category).filter(Boolean) as string[])], brands: [...new Set(group.map((x) => x.brand).filter(Boolean) as string[])], sample_live_urls: [...new Set(group.map((x) => x.live_url))].slice(0, 5), lead_score: score, qualification: score >= 65 ? 'high' : score >= 35 ? 'medium' : 'low', dedupe_status: 'new', scraped_at: now }; }).filter((lead) => (lead.follower_count ?? 0) >= input.minFollowerCount && (!input.sellerCountries.length || (!!lead.seller_country_code && input.sellerCountries.includes(lead.seller_country_code)))).sort((a, b) => b.lead_score - a.lead_score).slice(0, input.maxSellers);
-await Actor.pushData(leads); await Actor.setValue('OUTPUT', { status: failed.length === sources.length ? 'FAILED' : 'SUCCEEDED', discovered_sessions: sessions.size, qualified_leads: leads.length, failed_sources: failed, scraped_at: now }); await Actor.exit();
+const wantsProxy = input.proxyConfiguration.useApifyProxy || input.proxyConfiguration.proxyUrls;
+const proxyConfiguration = wantsProxy ? await Actor.createProxyConfiguration(input.proxyConfiguration) : undefined;
+
+const discoveryCrawler = new PlaywrightCrawler({
+    maxConcurrency: input.maxConcurrency,
+    maxRequestRetries: input.maxRequestRetries,
+    navigationTimeoutSecs: input.navigationTimeoutSecs,
+    requestHandlerTimeoutSecs: input.navigationTimeoutSecs + 30,
+    proxyConfiguration,
+    preNavigationHooks: [async ({ page, request }) => {
+        const captures: Promise<GraphqlCapture | null>[] = [];
+        page.on('response', (response) => {
+            if (!/\/d\/graphql(?:\?|$)/i.test(response.url())) return;
+            captures.push(captureGraphqlResponse(response).catch(() => null));
+        });
+        graphqlCaptures.set(requestKey(request), captures);
+    }],
+    requestHandler: async ({ page, request }) => {
+        await page.waitForTimeout(4_000);
+        const graphql = (await Promise.all(graphqlCaptures.get(requestKey(request)) ?? []))
+            .filter((item): item is GraphqlCapture => item !== null);
+        const scripts = await page.locator('script[type="application/ld+json"],script#__NEXT_DATA__').allTextContents();
+        const discovered = [
+            ...scripts.flatMap((json) => { try { return sessionsFromJson(JSON.parse(json), request.loadedUrl ?? request.url); } catch { return []; } }),
+            ...graphql.flatMap((capture) => sessionsFromEbayLiveFeed(capture.response)),
+        ].slice(0, input.maxLiveSessions);
+        for (const session of discovered) {
+            if (!input.includeEndedLives && session.status === 'ENDED') continue;
+            sessions.set(`${session.host_id}:${session.live_url}`, session);
+        }
+        const operations = graphql.map((capture) => ({
+            operation_name: capture.operation_name,
+            variable_keys: capture.variable_keys,
+            signals: inspectGraphqlResponse(capture.response),
+            live_feed_shapes: inspectLiveFeedShapes(capture.response),
+        }));
+        await Actor.setValue(`GRAPHQL_${request.id ?? request.uniqueKey}`, operations);
+        log.info('Processed eBay Live discovery source', { source: request.userData.source, sessions: sessions.size });
+    },
+    failedRequestHandler: ({ request }) => {
+        failedSources.push(request.url);
+        graphqlCaptures.delete(requestKey(request));
+    },
+});
+
+await discoveryCrawler.run(sources);
+
+const grouped = new Map<string, LiveSession[]>();
+for (const session of sessions.values()) {
+    const group = grouped.get(session.host_id) ?? [];
+    group.push(session);
+    grouped.set(session.host_id, group);
+}
+
+const candidates = [...grouped.values()]
+    .sort((left, right) => right.length - left.length)
+    .slice(0, input.maxProfileEnrichmentHosts);
+
+if (input.enrichProfiles && candidates.length) {
+    const profileCrawler = new PlaywrightCrawler({
+        maxConcurrency: input.maxProfileConcurrency,
+        maxRequestRetries: input.maxRequestRetries,
+        navigationTimeoutSecs: input.navigationTimeoutSecs,
+        requestHandlerTimeoutSecs: input.navigationTimeoutSecs + 30,
+        proxyConfiguration,
+        requestHandler: async ({ page, request }) => {
+            const hostId = String(request.userData.hostId);
+            const stats = parsePublicProfileText(await page.locator('body').innerText());
+            profileStats.set(hostId, stats);
+            log.info('Enriched public eBay seller profile', { hostId, itemsSold: stats.items_sold, followers: stats.follower_count, country: stats.seller_country });
+        },
+        failedRequestHandler: ({ request }) => { failedProfiles.push(String(request.userData.hostId)); },
+    });
+    await profileCrawler.run(candidates.map((group) => ({
+        url: group[0].profile_url,
+        uniqueKey: `profile:${group[0].host_id}`,
+        userData: { hostId: group[0].host_id },
+    })));
+}
+
+const scrapedAt = new Date().toISOString();
+const leads: Lead[] = candidates.map((group): Lead => {
+    const first = group[0];
+    const stats = profileStats.get(first.host_id);
+    const followerCount = (stats?.follower_count ?? Math.max(...group.map((session) => session.follower_count ?? 0))) || null;
+    const statuses = [...new Set(group.map((session) => session.status))];
+    const score = Math.min(100,
+        Math.round(Math.log10((stats?.items_sold ?? 0) + 1) * 18)
+        + Math.round(Math.log10((followerCount ?? 0) + 1) * 18)
+        + Math.min(30, group.length * 5)
+        + (statuses.includes('LIVE') ? 25 : statuses.includes('UPCOMING') ? 15 : 0),
+    );
+    return {
+        record_type: 'ebay_live_host_lead',
+        schema_version: '1.1',
+        platform: 'ebay_live',
+        seller_id: first.host_id,
+        seller_name: first.host_name,
+        seller_username: first.host_name,
+        profile_url: first.profile_url,
+        seller_country: stats?.seller_country ?? first.seller_country,
+        seller_country_code: stats?.seller_country_code ?? first.seller_country_code,
+        items_sold: stats?.items_sold ?? null,
+        items_listed: stats?.items_listed ?? null,
+        follower_count: followerCount,
+        feedback_rate: stats?.feedback_rate ?? null,
+        seller_stats_source: stats ? 'seller_profile' : 'live_event',
+        live_session_count: group.length,
+        live_status: statuses,
+        next_live_at: group.filter((session) => session.status === 'UPCOMING').map((session) => session.starts_at).filter(Boolean).sort()[0] ?? null,
+        categories: [...new Set(group.map((session) => session.category).filter(Boolean) as string[])],
+        brands: [...new Set(group.map((session) => session.brand).filter(Boolean) as string[])],
+        sample_live_urls: [...new Set(group.map((session) => session.live_url))].slice(0, 5),
+        lead_score: score,
+        qualification: score >= 65 ? 'high' : score >= 35 ? 'medium' : 'low',
+        dedupe_status: 'new',
+        scraped_at: scrapedAt,
+    };
+}).filter((lead) =>
+    (lead.follower_count ?? 0) >= input.minFollowerCount
+    && (!input.sellerCountries.length || (!!lead.seller_country_code && input.sellerCountries.includes(lead.seller_country_code))),
+).sort((left, right) => right.lead_score - left.lead_score).slice(0, input.maxSellers);
+
+await Actor.pushData(leads);
+await Actor.setValue('OUTPUT', {
+    status: failedSources.length === sources.length ? 'FAILED' : 'SUCCEEDED',
+    discovered_sessions: sessions.size,
+    profile_enrichment_attempted: input.enrichProfiles ? candidates.length : 0,
+    profile_enrichment_succeeded: profileStats.size,
+    profile_enrichment_failed: failedProfiles.length,
+    qualified_leads: leads.length,
+    failed_sources: failedSources,
+    scraped_at: scrapedAt,
+});
+await Actor.exit();

@@ -1,5 +1,5 @@
 {
   "actorSpecification": 1,
   "fields": {},
-  "views": { "overview": { "title": "eBay Live host leads", "transformation": { "fields": ["seller_name", "profile_url", "seller_country", "follower_count", "live_session_count", "live_status", "categories", "brands", "lead_score", "sample_live_urls"] }, "display": { "component": "table", "properties": {} } } }
+  "views": { "overview": { "title": "eBay Live host leads", "transformation": { "fields": ["seller_name", "profile_url", "seller_country", "feedback_rate", "items_sold", "items_listed", "follower_count", "live_session_count", "live_status", "categories", "brands", "lead_score", "sample_live_urls"] }, "display": { "component": "table", "properties": {} } } }
 }
