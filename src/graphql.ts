@@ -17,6 +17,13 @@ export interface GraphqlFeedShape {
     fields: Array<{ path: string; keys: string[]; samples: Record<string, string | number | boolean | null> }>;
 }
 
+export interface SellerProfileShape {
+    host_keys: string[];
+    host_samples: Record<string, string | number | boolean | null>;
+    profile_keys: string[];
+    profile_samples: Record<string, string | number | boolean | null>;
+}
+
 function parseJson(value: string | null): unknown {
     if (!value) return null;
     try {
@@ -107,4 +114,37 @@ export function inspectLiveFeedShapes(value: unknown): GraphqlFeedShape[] {
     };
     visit(value, '$', 0);
     return shapes.slice(0, 10);
+}
+
+/** Bounded public host/sellerProfile field map from eBay Live feed cards. */
+export function inspectSellerProfileShapes(value: unknown): SellerProfileShape[] {
+    const results: SellerProfileShape[] = [];
+    const scalarSamples = (record: Record<string, unknown>) => Object.fromEntries(
+        Object.entries(record)
+            .filter(([, field]) => field === null || ['string', 'number', 'boolean'].includes(typeof field))
+            .slice(0, 40)
+            .map(([key, field]) => [key, typeof field === 'string' ? field.slice(0, 120) : field as number | boolean | null]),
+    );
+    const visit = (node: unknown, depth: number) => {
+        if (depth > 16 || results.length >= 20 || !node || typeof node !== 'object') return;
+        if (Array.isArray(node)) { node.slice(0, 10).forEach((item) => visit(item, depth + 1)); return; }
+        const record = node as Record<string, unknown>;
+        if (record.__typename === 'LiveEvent' && Array.isArray(record.hosts)) {
+            for (const rawHost of record.hosts.slice(0, 5)) {
+                if (!rawHost || typeof rawHost !== 'object') continue;
+                const host = rawHost as Record<string, unknown>;
+                const profile = host.sellerProfile && typeof host.sellerProfile === 'object'
+                    ? host.sellerProfile as Record<string, unknown> : {};
+                results.push({
+                    host_keys: Object.keys(host).sort(),
+                    host_samples: scalarSamples(host),
+                    profile_keys: Object.keys(profile).sort(),
+                    profile_samples: scalarSamples(profile),
+                });
+            }
+        }
+        Object.values(record).forEach((child) => visit(child, depth + 1));
+    };
+    visit(value, 0);
+    return results;
 }

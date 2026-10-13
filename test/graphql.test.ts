@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captureGraphqlResponse, inspectGraphqlResponse, inspectLiveFeedShapes } from '../src/graphql.js';
+import { captureGraphqlResponse, inspectGraphqlResponse, inspectLiveFeedShapes, inspectSellerProfileShapes } from '../src/graphql.js';
 
 describe('GraphQL capture', () => {
     it('keeps operation metadata and a public response body', async () => {
@@ -19,5 +19,10 @@ describe('GraphQL capture', () => {
     it('maps the proven feedCollectionStreamV2 branch without retaining full results', () => {
         const shapes = inspectLiveFeedShapes({ data: { module: { feedCollectionStreamV2: { feedCollection: { items: [{ title: 'Live' }] }, streamInfoV2: { status: 'LIVE' } } } } });
         expect(shapes[0].fields[0].keys).toEqual(expect.arrayContaining(['feedCollection', 'streamInfoV2']));
+    });
+
+    it('maps bounded sellerProfile fields from LiveEvent hosts', () => {
+        const shapes = inspectSellerProfileShapes({ __typename: 'LiveEvent', hosts: [{ id: 'h1', userAccountName: 'seller', sellerProfile: { followers: 12, location: 'US' } }] });
+        expect(shapes[0]).toMatchObject({ profile_keys: ['followers', 'location'], profile_samples: { followers: 12, location: 'US' } });
     });
 });

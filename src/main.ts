@@ -1,7 +1,7 @@
 import { PlaywrightCrawler } from '@crawlee/playwright';
 import { Actor, log } from 'apify';
 
-import { captureGraphqlResponse, inspectGraphqlResponse, inspectLiveFeedShapes, type GraphqlCapture } from './graphql.js';
+import { captureGraphqlResponse, inspectGraphqlResponse, inspectLiveFeedShapes, inspectSellerProfileShapes, type GraphqlCapture } from './graphql.js';
 import { normalizeInput } from './input.js';
 import { sessionsFromEbayLiveFeed, sessionsFromJson } from './parser.js';
 import { parsePublicProfileText } from './profile.js';
@@ -57,6 +57,7 @@ const discoveryCrawler = new PlaywrightCrawler({
             variable_keys: capture.variable_keys,
             signals: inspectGraphqlResponse(capture.response),
             live_feed_shapes: inspectLiveFeedShapes(capture.response),
+            seller_profile_shapes: inspectSellerProfileShapes(capture.response),
         }));
         await Actor.setValue(`GRAPHQL_${request.id ?? request.uniqueKey}`, operations);
         log.info('Processed eBay Live discovery source', { source: request.userData.source, sessions: sessions.size });
