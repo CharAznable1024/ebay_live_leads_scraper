@@ -1,0 +1,1 @@
+{ "extends": "@apify/tsconfig", "compilerOptions": { "outDir": "dist", "rootDir": ".", "lib": ["ES2022", "DOM"] }, "include": ["src", "test"] }

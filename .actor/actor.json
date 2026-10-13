@@ -1,0 +1,12 @@
+{
+  "$schema": "https://apify.com/schemas/v1/actor.ide.json",
+  "actorSpecification": 1,
+  "name": "ebay-live-leads-scraper",
+  "title": "eBay Live Lead Scraper",
+  "description": "Discovers public eBay Live hosts and seller leads.",
+  "version": "0.1",
+  "inputSchema": "./input_schema.json",
+  "storages": { "dataset": "./dataset_schema.json" },
+  "dockerfile": "../Dockerfile",
+  "defaultRunOptions": { "build": "latest", "timeoutSecs": 1800, "memoryMbytes": 2048 }
+}

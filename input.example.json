@@ -1,0 +1,16 @@
+{
+  "searchQueries": [],
+  "startUrls": ["https://www.ebay.com/ebaylive/"],
+  "country": "US",
+  "sellerCountries": [],
+  "maxLiveSessions": 100,
+  "maxSellers": 25,
+  "minFollowerCount": 0,
+  "includeEndedLives": true,
+  "maxConcurrency": 1,
+  "maxRequestRetries": 2,
+  "navigationTimeoutSecs": 60,
+  "dedupeMode": "new_and_updated",
+  "dedupeStoreName": "ebay-live-lead-state-v1",
+  "proxyConfiguration": { "useApifyProxy": false }
+}
