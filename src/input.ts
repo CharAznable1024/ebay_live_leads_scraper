@@ -1,6 +1,6 @@
 import type { ActorInput, DedupeMode, Input, Marketplace } from './types.js';
 const markets = new Set<Marketplace>(['US', 'GB', 'DE', 'AU', 'CA']);
-const list = (value: unknown, fallback: string[], field: string) => { const raw = value === undefined ? fallback : value; if (!Array.isArray(raw)) throw new Error(`${field} must be an array`); return [...new Set(raw.map((v) => typeof v === 'string' ? v.trim() : '').filter(Boolean))]; };
+const list = (value: unknown, fallback: string[], field: string) => { const raw = value === undefined ? fallback : value; if (!Array.isArray(raw)) throw new Error(`${field} must be an array`); return [...new Set(raw.map((v) => typeof v === 'string' ? v.trim() : v && typeof v === 'object' && typeof (v as { url?: unknown }).url === 'string' ? (v as { url: string }).url.trim() : '').filter(Boolean))]; };
 const integer = (value: unknown, fallback: number, min: number, max: number, field: string) => { const v = value === undefined ? fallback : value; if (!Number.isInteger(v) || (v as number) < min || (v as number) > max) throw new Error(`${field} must be an integer between ${min} and ${max}`); return v as number; };
 const bool = (value: unknown, fallback: boolean, field: string) => { const v = value === undefined ? fallback : value; if (typeof v !== 'boolean') throw new Error(`${field} must be a boolean`); return v; };
 export function normalizeInput(raw: ActorInput | null | undefined): Input {
