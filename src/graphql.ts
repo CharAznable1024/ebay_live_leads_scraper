@@ -12,6 +12,11 @@ export interface GraphqlSignal {
     samples: Record<string, string | number | boolean | null>;
 }
 
+export interface GraphqlFeedShape {
+    path: string;
+    fields: Array<{ path: string; keys: string[]; samples: Record<string, string | number | boolean | null> }>;
+}
+
 function parseJson(value: string | null): unknown {
     if (!value) return null;
     try {
@@ -54,7 +59,7 @@ export function inspectGraphqlResponse(value: unknown, maximum = 40): GraphqlSig
         return undefined;
     };
     const visit = (node: unknown, path: string, depth: number) => {
-        if (results.length >= maximum || depth > 8 || !node || typeof node !== 'object') return;
+        if (results.length >= maximum || depth > 14 || !node || typeof node !== 'object') return;
         if (Array.isArray(node)) {
             if (node.length) visit(node[0], `${path}[]`, depth + 1);
             return;
@@ -73,4 +78,33 @@ export function inspectGraphqlResponse(value: unknown, maximum = 40): GraphqlSig
     };
     visit(value, '$', 0);
     return results;
+}
+
+/** Gives an intentionally small field map for the proven eBay Live feed node. */
+export function inspectLiveFeedShapes(value: unknown): GraphqlFeedShape[] {
+    const shapes: GraphqlFeedShape[] = [];
+    const scalar = (value: unknown): string | number | boolean | null | undefined => {
+        if (typeof value === 'string') return value.slice(0, 120);
+        if (typeof value === 'number' || typeof value === 'boolean' || value === null) return value;
+        return undefined;
+    };
+    const summarize = (node: unknown, path: string, depth: number, fields: GraphqlFeedShape['fields']) => {
+        if (depth > 5 || fields.length >= 30 || !node || typeof node !== 'object') return;
+        if (Array.isArray(node)) { if (node.length) summarize(node[0], `${path}[]`, depth + 1, fields); return; }
+        const record = node as Record<string, unknown>; const samples: Record<string, string | number | boolean | null> = {};
+        for (const [key, value] of Object.entries(record)) { const sample = scalar(value); if (sample !== undefined) samples[key] = sample; }
+        fields.push({ path, keys: Object.keys(record).sort().slice(0, 50), samples });
+        for (const [key, child] of Object.entries(record)) summarize(child, `${path}.${key}`, depth + 1, fields);
+    };
+    const visit = (node: unknown, path: string, depth: number) => {
+        if (depth > 14 || !node || typeof node !== 'object') return;
+        if (Array.isArray(node)) { node.forEach((item, index) => { if (index < 3) visit(item, `${path}[]`, depth + 1); }); return; }
+        const record = node as Record<string, unknown>;
+        if (record.feedCollectionStreamV2 && typeof record.feedCollectionStreamV2 === 'object') {
+            const fields: GraphqlFeedShape['fields'] = []; summarize(record.feedCollectionStreamV2, `${path}.feedCollectionStreamV2`, 0, fields); shapes.push({ path, fields });
+        }
+        for (const [key, child] of Object.entries(record)) visit(child, `${path}.${key}`, depth + 1);
+    };
+    visit(value, '$', 0);
+    return shapes.slice(0, 10);
 }

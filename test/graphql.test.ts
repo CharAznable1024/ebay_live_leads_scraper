@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captureGraphqlResponse, inspectGraphqlResponse } from '../src/graphql.js';
+import { captureGraphqlResponse, inspectGraphqlResponse, inspectLiveFeedShapes } from '../src/graphql.js';
 
 describe('GraphQL capture', () => {
     it('keeps operation metadata and a public response body', async () => {
@@ -14,5 +14,10 @@ describe('GraphQL capture', () => {
     it('keeps only bounded structural signals for payload mapping', () => {
         const signals = inspectGraphqlResponse({ data: { feed: { liveEvent: { id: 'e1', host: { username: 'seller' } } } } });
         expect(signals.some((signal) => signal.path === '$.data.feed' && signal.keys.includes('liveEvent'))).toBe(true);
+    });
+
+    it('maps the proven feedCollectionStreamV2 branch without retaining full results', () => {
+        const shapes = inspectLiveFeedShapes({ data: { module: { feedCollectionStreamV2: { feedCollection: { items: [{ title: 'Live' }] }, streamInfoV2: { status: 'LIVE' } } } } });
+        expect(shapes[0].fields[0].keys).toEqual(expect.arrayContaining(['feedCollection', 'streamInfoV2']));
     });
 });
