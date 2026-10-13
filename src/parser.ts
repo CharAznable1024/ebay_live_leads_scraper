@@ -15,4 +15,45 @@ export function sessionsFromJson(value: unknown, sourceUrl: string): LiveSession
     Object.values(r).forEach(visit);
   }; visit(value); return dedupe(sessions);
 }
+
+/**
+ * Exact mapper for the public GetNextFilterFeed model observed on eBay Live:
+ * feedCollectionStreamV2.feedCollection[].collection[] is a LiveEvent.
+ */
+export function sessionsFromEbayLiveFeed(value: unknown): LiveSession[] {
+  const sessions: LiveSession[] = [];
+  const visit = (node: unknown) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) { node.forEach(visit); return; }
+    const event = node as Record<string, unknown>;
+    if (event.__typename === 'LiveEvent' && typeof event.liveEventId === 'string' && Array.isArray(event.hosts)) {
+      const eventUrl = `https://www.ebay.com/ebaylive/events/${encodeURIComponent(event.liveEventId)}`;
+      for (const rawHost of event.hosts) {
+        if (!rawHost || typeof rawHost !== 'object') continue;
+        const host = rawHost as Record<string, unknown>;
+        const sellerProfile = host.sellerProfile && typeof host.sellerProfile === 'object' ? host.sellerProfile as Record<string, unknown> : {};
+        const hostId = text(host.id ?? host.userAccountName);
+        if (!hostId) continue;
+        const username = text(host.userAccountName ?? sellerProfile.userAccountName ?? sellerProfile.username) ?? hostId;
+        sessions.push({
+          host_id: hostId,
+          host_name: username,
+          profile_url: text(sellerProfile.profileUrl ?? sellerProfile.storeUrl) ?? `https://www.ebay.com/usr/${encodeURIComponent(username)}`,
+          live_url: eventUrl,
+          title: text(event.title),
+          status: status(event.state),
+          starts_at: text(event.startTime),
+          seller_country: text(sellerProfile.country ?? sellerProfile.location ?? sellerProfile.countryName),
+          seller_country_code: countryCode(sellerProfile.countryCode),
+          follower_count: number(sellerProfile.followerCount ?? sellerProfile.followers ?? sellerProfile.followersCount),
+          category: text(event.tags),
+          brand: null,
+        });
+      }
+    }
+    Object.values(event).forEach(visit);
+  };
+  visit(value);
+  return dedupe(sessions);
+}
 function dedupe(items: LiveSession[]): LiveSession[] { return [...new Map(items.map((x) => [`${x.host_id}:${x.live_url}`, x])).values()]; }
