@@ -20,6 +20,10 @@ describe('public eBay seller profile parser', () => {
         });
     });
 
+    it('rejects prose containing the word location when no country is present', () => {
+        expect(parsePublicProfileText('location of the company. Extended shipping duration')).toMatchObject({ seller_country: null, seller_country_code: null });
+    });
+
     it('finds the public About tab and merges its location', () => {
         expect(findAboutUrl('<a href="/about">About eBay</a><a href="/str/store/about">About</a>', 'https://www.ebay.com/usr/seller', 'seller')).toBe('https://www.ebay.com/str/store/about');
         const primary = parsePublicProfileText('99.9% positive 18K items sold 4.5K followers');

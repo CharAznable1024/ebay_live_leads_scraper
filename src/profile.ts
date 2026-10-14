@@ -39,15 +39,16 @@ export function parsePublicProfileText(bodyText: string): PublicProfileStats {
     const text = bodyText.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ');
     const feedbackRateText = text.match(/([\d.]+)\s*%\s*(?:positive|好评率)/i)?.[1];
     const feedbackRate = feedbackRateText ? Number(feedbackRateText) : null;
-    const location = text.match(/(?:located in|location|所在地|位于)\s*[:：]?\s*([^|•\n]{2,100})/i)?.[1]?.trim() ?? null;
+    const rawLocation = text.match(/(?:located in|location|所在地|位于)\s*[:：]?\s*([^|•\n]{2,100})/i)?.[1]?.trim() ?? null;
+    const locationCode = countryCode(rawLocation);
     return {
         feedback_rate: feedbackRate !== null && Number.isFinite(feedbackRate) ? feedbackRate : null,
         feedback_score: matchNumber(text, [/(?:feedback\s*score|信用评价)\s*[:：]\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:feedback(?:\s+ratings?)?|条信用评价)/i, /\(([\d.,]+\s*[KMB万]?)\)\s*[\d.]+\s*%\s*(?:positive|好评率)/i]),
         items_sold: matchNumber(text, [/([\d.,]+\s*[KMB万]?)\s*(?:items?\s*sold|件物品)/i, /(?:sold|已售出)\s*([\d.,]+\s*[KMB万]?)/i]),
         items_listed: matchNumber(text, [/(?:for sale|在售|选购)\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:items?\s*for sale|件在售)/i]),
         follower_count: matchNumber(text, [/(?:followers?|关注者)\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:followers?|位关注者)/i]),
-        seller_country: location,
-        seller_country_code: countryCode(location),
+        seller_country: locationCode ? rawLocation : null,
+        seller_country_code: locationCode,
         stats_source: 'seller_profile',
     };
 }
