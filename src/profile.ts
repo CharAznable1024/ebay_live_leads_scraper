@@ -50,3 +50,31 @@ export function parsePublicProfileText(bodyText: string): PublicProfileStats {
         stats_source: 'seller_profile',
     };
 }
+
+/** Finds the public About tab URL rendered in an eBay Store profile. */
+export function findAboutUrl(html: string, profileUrl: string, username: string): string {
+    const anchor = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    for (const match of html.matchAll(anchor)) {
+        const href = match[1].replace(/&amp;/gi, '&');
+        const label = match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (/\babout\b|关于/i.test(label) || /(?:\/about(?:[/?#]|$)|[?&#](?:tab|_tab)=about)/i.test(href)) {
+            return new URL(href, profileUrl).toString();
+        }
+    }
+    const canonical = html.match(/<link\b[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i)?.[1]
+        ?? html.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*rel=["']canonical["']/i)?.[1];
+    if (canonical && /\/str\//i.test(canonical)) return `${canonical.replace(/\/$/, '')}/about`;
+    return `https://www.ebay.com/str/${encodeURIComponent(username)}/about`;
+}
+
+export function mergePublicProfileStats(primary: PublicProfileStats, about: PublicProfileStats): PublicProfileStats {
+    return {
+        feedback_rate: primary.feedback_rate ?? about.feedback_rate,
+        items_sold: primary.items_sold ?? about.items_sold,
+        items_listed: primary.items_listed ?? about.items_listed,
+        follower_count: primary.follower_count ?? about.follower_count,
+        seller_country: about.seller_country ?? primary.seller_country,
+        seller_country_code: about.seller_country_code ?? primary.seller_country_code,
+        stats_source: 'seller_profile',
+    };
+}

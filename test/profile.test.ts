@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parsePublicProfileText } from '../src/profile.js';
+import { findAboutUrl, mergePublicProfileStats, parsePublicProfileText } from '../src/profile.js';
 
 describe('public eBay seller profile parser', () => {
     it('parses English public seller metrics and location', () => {
@@ -18,5 +18,12 @@ describe('public eBay seller profile parser', () => {
             follower_count: 4_490,
             seller_country_code: 'US',
         });
+    });
+
+    it('finds the public About tab and merges its location', () => {
+        expect(findAboutUrl('<a href="/str/store/about">About</a>', 'https://www.ebay.com/usr/seller', 'seller')).toBe('https://www.ebay.com/str/store/about');
+        const primary = parsePublicProfileText('99.9% positive 18K items sold 4.5K followers');
+        const about = parsePublicProfileText('Located in: United States Member since 2020');
+        expect(mergePublicProfileStats(primary, about)).toMatchObject({ items_sold: 18_000, follower_count: 4_500, seller_country_code: 'US' });
     });
 });

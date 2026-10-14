@@ -5,7 +5,7 @@ import { fetchWithWebUnlocker, htmlToVisibleText, inspectUnlockedHtml } from './
 import { captureGraphqlResponse, inspectGraphqlResponse, inspectLiveFeedShapes, inspectSellerProfileShapes, type GraphqlCapture } from './graphql.js';
 import { normalizeInput } from './input.js';
 import { sessionsFromEbayLiveFeed, sessionsFromJson } from './parser.js';
-import { parsePublicProfileText } from './profile.js';
+import { findAboutUrl, mergePublicProfileStats, parsePublicProfileText } from './profile.js';
 import type { ActorInput, Lead, LiveSession, PublicProfileStats } from './types.js';
 
 await Actor.init();
@@ -15,6 +15,8 @@ const sessions = new Map<string, LiveSession>();
 const profileStats = new Map<string, PublicProfileStats>();
 const failedSources: string[] = [];
 const failedProfiles: string[] = [];
+let aboutEnrichmentAttempted = 0;
+let aboutEnrichmentSucceeded = 0;
 const graphqlCaptures = new Map<string, Promise<GraphqlCapture | null>[]>();
 const defaultUrl = 'https://www.ebay.com/ebaylive/';
 const sourceUrls = input.startUrls.length ? input.startUrls : [defaultUrl];
@@ -123,7 +125,27 @@ if (useBrightData && candidates.length) {
                 });
                 await Actor.setValue(`UNLOCKER_DEBUG_${first.host_id}`, inspectUnlockedHtml(result.html, first.host_name ?? first.host_id, result));
                 if (!result.html.trim()) throw new Error(`Web Unlocker returned an empty body with HTTP ${result.status_code}`);
-                const stats = parsePublicProfileText(htmlToVisibleText(result.html));
+                let stats = parsePublicProfileText(htmlToVisibleText(result.html));
+                if (!stats.seller_country_code) {
+                    aboutEnrichmentAttempted += 1;
+                    const username = first.host_name ?? first.host_id;
+                    const aboutUrl = findAboutUrl(result.html, first.profile_url, username);
+                    try {
+                        const aboutResult = await fetchWithWebUnlocker(aboutUrl, {
+                            apiKey: brightDataApiKey as string,
+                            zone: brightDataZone,
+                            country: input.country,
+                            timeoutMillis: input.navigationTimeoutSecs * 1_000,
+                        });
+                        await Actor.setValue(`UNLOCKER_ABOUT_DEBUG_${first.host_id}`, inspectUnlockedHtml(aboutResult.html, username, aboutResult));
+                        if (!aboutResult.html.trim()) throw new Error(`Web Unlocker returned an empty About body with HTTP ${aboutResult.status_code}`);
+                        const aboutStats = parsePublicProfileText(htmlToVisibleText(aboutResult.html));
+                        stats = mergePublicProfileStats(stats, aboutStats);
+                        if (aboutStats.seller_country || aboutStats.seller_country_code) aboutEnrichmentSucceeded += 1;
+                    } catch (error) {
+                        log.warning('Web Unlocker About enrichment failed', { hostId: first.host_id, aboutUrl, error: String(error) });
+                    }
+                }
                 profileStats.set(first.host_id, stats);
                 log.info('Enriched public eBay seller profile through Web Unlocker', {
                     hostId: first.host_id,
@@ -211,6 +233,8 @@ await Actor.setValue('OUTPUT', {
     profile_enrichment_provider: useBrightData ? 'bright_data_web_unlocker' : input.enrichProfiles ? 'direct_browser' : 'disabled',
     profile_enrichment_succeeded: profileStats.size,
     profile_enrichment_failed: failedProfiles.length,
+    profile_about_enrichment_attempted: aboutEnrichmentAttempted,
+    profile_about_enrichment_succeeded: aboutEnrichmentSucceeded,
     qualified_leads: leads.length,
     failed_sources: failedSources,
     scraped_at: scrapedAt,
