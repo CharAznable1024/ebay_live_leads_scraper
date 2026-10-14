@@ -3,7 +3,7 @@ import { Actor, log } from 'apify';
 
 import { fetchWithWebUnlocker, htmlToVisibleText, inspectUnlockedHtml } from './bright-data.js';
 import { captureGraphqlResponse, inspectGraphqlResponse, inspectLiveFeedShapes, inspectSellerProfileShapes, type GraphqlCapture } from './graphql.js';
-import { normalizeInput } from './input.js';
+import { MARKETPLACE_BASE_URLS, normalizeInput } from './input.js';
 import { sessionsFromEbayLiveFeed, sessionsFromJson } from './parser.js';
 import { findAboutUrl, findFeedbackUrl, mergePublicProfileStats, parsePublicProfileText } from './profile.js';
 import type { ActorInput, Lead, LiveSession, PublicProfileStats } from './types.js';
@@ -20,7 +20,8 @@ let aboutEnrichmentSucceeded = 0;
 let feedbackEnrichmentAttempted = 0;
 let feedbackEnrichmentSucceeded = 0;
 const graphqlCaptures = new Map<string, Promise<GraphqlCapture | null>[]>();
-const defaultUrl = 'https://www.ebay.com/ebaylive/';
+const marketplaceBaseUrl = MARKETPLACE_BASE_URLS[input.country];
+const defaultUrl = `${marketplaceBaseUrl}/ebaylive/`;
 const sourceUrls = input.startUrls.length ? input.startUrls : [defaultUrl];
 const sources = [
     ...sourceUrls.map((url) => ({ url, userData: { source: url } })),
@@ -66,7 +67,7 @@ const discoveryCrawler = new PlaywrightCrawler({
         const scripts = await page.locator('script[type="application/ld+json"],script#__NEXT_DATA__').allTextContents();
         const discovered = [
             ...scripts.flatMap((json) => { try { return sessionsFromJson(JSON.parse(json), request.loadedUrl ?? request.url); } catch { return []; } }),
-            ...graphql.flatMap((capture) => sessionsFromEbayLiveFeed(capture.response)),
+            ...graphql.flatMap((capture) => sessionsFromEbayLiveFeed(capture.response, request.loadedUrl ?? request.url)),
         ].slice(0, input.maxLiveSessions);
         for (const session of discovered) {
             if (!input.includeEndedLives && session.status === 'ENDED') continue;
@@ -94,7 +95,7 @@ for (const username of input.sellerUsernames) {
     sessions.set(`seed:${username}`, {
         host_id: username,
         host_name: username,
-        profile_url: `https://www.ebay.com/usr/${encodeURIComponent(username)}`,
+        profile_url: `${marketplaceBaseUrl}/usr/${encodeURIComponent(username)}`,
         live_url: defaultUrl,
         title: null,
         status: 'UNKNOWN',

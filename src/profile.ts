@@ -86,7 +86,7 @@ export function findFeedbackUrl(html: string, profileUrl: string, username: stri
         ?? html.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*rel=["']canonical["']/i)?.[1];
     const storefront = canonical && /\/str\/[^/?#]+/i.test(canonical)
         ? new URL(canonical, profileUrl).toString()
-        : `https://www.ebay.com/str/${encodeURIComponent(username)}`;
+        : new URL(`/str/${encodeURIComponent(username)}`, profileUrl).toString();
     const feedback = new URL(storefront);
     feedback.searchParams.set('_tab', 'feedback');
     return feedback.toString();
@@ -108,7 +108,7 @@ export function findAboutUrl(html: string, profileUrl: string, username: string)
         ?? html.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*rel=["']canonical["']/i)?.[1];
     const storefront = canonical && /\/str\/[^/?#]+/i.test(canonical)
         ? new URL(canonical, profileUrl).toString()
-        : `https://www.ebay.com/str/${encodeURIComponent(username)}`;
+        : new URL(`/str/${encodeURIComponent(username)}`, profileUrl).toString();
     const about = new URL(storefront);
     about.searchParams.set('_tab', 'about');
     return about.toString();

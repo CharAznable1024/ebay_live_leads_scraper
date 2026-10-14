@@ -1,5 +1,9 @@
 import type { ActorInput, DedupeMode, Input, Marketplace, ProfileEnrichmentMode } from './types.js';
 const markets = new Set<Marketplace>(['US', 'GB', 'DE', 'AU', 'CA']);
+export const MARKETPLACE_BASE_URLS: Record<Marketplace, string> = {
+  US: 'https://www.ebay.com', GB: 'https://www.ebay.co.uk', DE: 'https://www.ebay.de',
+  AU: 'https://www.ebay.com.au', CA: 'https://www.ebay.ca',
+};
 // EU member states (not the wider EEA): use the `EU` input value as a
 // convenience filter and retain concrete ISO codes internally.
 const EU_COUNTRY_CODES = [

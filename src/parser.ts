@@ -20,14 +20,14 @@ export function sessionsFromJson(value: unknown, sourceUrl: string): LiveSession
  * Exact mapper for the public GetNextFilterFeed model observed on eBay Live:
  * feedCollectionStreamV2.feedCollection[].collection[] is a LiveEvent.
  */
-export function sessionsFromEbayLiveFeed(value: unknown): LiveSession[] {
+export function sessionsFromEbayLiveFeed(value: unknown, sourceUrl = 'https://www.ebay.com/ebaylive/'): LiveSession[] {
   const sessions: LiveSession[] = [];
   const visit = (node: unknown) => {
     if (!node || typeof node !== 'object') return;
     if (Array.isArray(node)) { node.forEach(visit); return; }
     const event = node as Record<string, unknown>;
     if (event.__typename === 'LiveEvent' && typeof event.liveEventId === 'string' && Array.isArray(event.hosts)) {
-      const eventUrl = `https://www.ebay.com/ebaylive/events/${encodeURIComponent(event.liveEventId)}`;
+      const eventUrl = new URL(`/ebaylive/events/${encodeURIComponent(event.liveEventId)}`, sourceUrl).toString();
       for (const rawHost of event.hosts) {
         if (!rawHost || typeof rawHost !== 'object') continue;
         const host = rawHost as Record<string, unknown>;
@@ -38,7 +38,7 @@ export function sessionsFromEbayLiveFeed(value: unknown): LiveSession[] {
         sessions.push({
           host_id: hostId,
           host_name: username,
-          profile_url: text(sellerProfile.profileUrl ?? sellerProfile.storeUrl) ?? `https://www.ebay.com/usr/${encodeURIComponent(username)}`,
+          profile_url: text(sellerProfile.profileUrl ?? sellerProfile.storeUrl) ?? new URL(`/usr/${encodeURIComponent(username)}`, sourceUrl).toString(),
           live_url: eventUrl,
           title: text(event.title),
           status: status(event.state),
