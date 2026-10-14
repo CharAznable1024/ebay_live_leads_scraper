@@ -56,10 +56,10 @@ const discoveryCrawler = new PlaywrightCrawler({
         // The initial feed is sometimes requested only after the page becomes
         // interactive. Scroll through enough public cards to trigger bounded
         // GetNextFilterFeed pagination before collecting captured responses.
-        const scrollRounds = Math.min(5, Math.max(1, Math.ceil(input.maxLiveSessions / 20)));
+        const scrollRounds = Math.min(10, Math.max(1, Math.ceil(input.maxLiveSessions / 10)));
         for (let round = 0; round < scrollRounds; round += 1) {
             await page.waitForTimeout(round === 0 ? 3_000 : 1_500);
-            await page.evaluate(() => window.scrollBy(0, Math.max(window.innerHeight * 4, document.body.scrollHeight)));
+            await page.evaluate(() => window.scrollBy(0, window.innerHeight * 3));
         }
         const graphql = (await Promise.all(graphqlCaptures.get(requestKey(request)) ?? []))
             .filter((item): item is GraphqlCapture => item !== null);
