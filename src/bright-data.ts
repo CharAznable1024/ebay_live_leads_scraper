@@ -92,11 +92,17 @@ export function htmlToVisibleText(html: string): string {
 
 export function inspectUnlockedHtml(html: string, sellerUsername: string, metadata?: Partial<WebUnlockerResult>) {
     const visibleText = htmlToVisibleText(html);
+    const links = [...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
+        .map((match) => ({ href: match[1].replace(/&amp;/gi, '&'), label: match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) }))
+        .filter((link) => /about|关于|\/str\//i.test(`${link.href} ${link.label}`))
+        .slice(0, 20);
     return {
         html_bytes: Buffer.byteLength(html),
         status_code: metadata?.status_code ?? null,
         content_type: metadata?.content_type ?? null,
         bright_data_error: metadata?.bright_data_error ?? null,
+        canonical_url: html.match(/<link\b[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i)?.[1] ?? null,
+        about_link_candidates: links,
         title: html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, ' ').trim() ?? null,
         contains_seller_username: visibleText.toLowerCase().includes(sellerUsername.toLowerCase()),
         contains_captcha_or_error: /captcha|robot|something went wrong|access denied|verify you are human/i.test(visibleText),
