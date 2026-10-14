@@ -3,6 +3,7 @@ export interface WebUnlockerOptions {
     zone: string;
     country: string;
     timeoutMillis: number;
+    maxAttempts?: number;
 }
 
 export interface WebUnlockerResult {
@@ -20,6 +21,23 @@ export async function fetchWithWebUnlocker(
     options: WebUnlockerOptions,
     fetcher: Fetch = fetch,
 ): Promise<WebUnlockerResult> {
+    const maxAttempts = Math.max(1, options.maxAttempts ?? 3);
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+            const result = await fetchUnlockerOnce(targetUrl, options, fetcher);
+            if (result.bright_data_error) throw new Error(`Bright Data error: ${result.bright_data_error}`);
+            if (!result.html.trim()) throw new Error(`Web Unlocker returned an empty body with HTTP ${result.status_code}`);
+            return result;
+        } catch (error) {
+            lastError = error;
+            if (attempt < maxAttempts) await new Promise((resolve) => setTimeout(resolve, attempt * 750));
+        }
+    }
+    throw lastError;
+}
+
+async function fetchUnlockerOnce(targetUrl: string, options: WebUnlockerOptions, fetcher: Fetch): Promise<WebUnlockerResult> {
     const response = await fetcher('https://api.brightdata.com/request', {
         method: 'POST',
         headers: {

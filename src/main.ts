@@ -124,6 +124,7 @@ if (useBrightData && candidates.length) {
                     zone: brightDataZone,
                     country: input.country,
                     timeoutMillis: input.navigationTimeoutSecs * 1_000,
+                    maxAttempts: input.maxRequestRetries + 1,
                 });
                 await Actor.setValue(`UNLOCKER_DEBUG_${first.host_id}`, inspectUnlockedHtml(result.html, first.host_name ?? first.host_id, result));
                 if (!result.html.trim()) throw new Error(`Web Unlocker returned an empty body with HTTP ${result.status_code}`);
@@ -138,6 +139,7 @@ if (useBrightData && candidates.length) {
                             zone: brightDataZone,
                             country: input.country,
                             timeoutMillis: input.navigationTimeoutSecs * 1_000,
+                            maxAttempts: input.maxRequestRetries + 1,
                         });
                         await Actor.setValue(`UNLOCKER_ABOUT_DEBUG_${first.host_id}`, inspectUnlockedHtml(aboutResult.html, username, aboutResult));
                         if (!aboutResult.html.trim()) throw new Error(`Web Unlocker returned an empty About body with HTTP ${aboutResult.status_code}`);
@@ -156,6 +158,7 @@ if (useBrightData && candidates.length) {
                         const feedbackResult = await fetchWithWebUnlocker(feedbackUrl, {
                             apiKey: brightDataApiKey as string, zone: brightDataZone, country: input.country,
                             timeoutMillis: input.navigationTimeoutSecs * 1_000,
+                            maxAttempts: input.maxRequestRetries + 1,
                         });
                         await Actor.setValue(`UNLOCKER_FEEDBACK_DEBUG_${first.host_id}`, inspectUnlockedHtml(feedbackResult.html, username, feedbackResult));
                         if (!feedbackResult.html.trim()) throw new Error(`Web Unlocker returned an empty Feedback body with HTTP ${feedbackResult.status_code}`);

@@ -21,6 +21,19 @@ describe('Bright Data Web Unlocker client', () => {
         expect(htmlToVisibleText('<style>x</style><div>99.9% positive &amp; trusted</div>')).toBe('99.9% positive & trusted');
     });
 
+    it('retries an empty successful response', async () => {
+        let calls = 0;
+        const fetcher = (async () => {
+            calls += 1;
+            return new Response(calls === 1 ? '' : '<div>seller</div>', { status: 200 });
+        }) as typeof fetch;
+        const result = await fetchWithWebUnlocker('https://www.ebay.com/usr/seller', {
+            apiKey: 'secret', zone: 'zone', country: 'US', timeoutMillis: 10_000, maxAttempts: 2,
+        }, fetcher);
+        expect(result.html).toContain('seller');
+        expect(calls).toBe(2);
+    });
+
     it('creates a bounded unlock diagnostic without retaining full HTML', () => {
         expect(inspectUnlockedHtml('<title>Seller</title><div>purecrystalhub profile</div>', 'purecrystalhub', { status_code: 200 })).toMatchObject({
             title: 'Seller', status_code: 200, contains_seller_username: true, contains_captcha_or_error: false,
