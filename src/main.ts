@@ -1,6 +1,7 @@
 import { PlaywrightCrawler } from '@crawlee/playwright';
 import { Actor, log } from 'apify';
 
+import { fetchWithWebUnlocker, htmlToVisibleText } from './bright-data.js';
 import { captureGraphqlResponse, inspectGraphqlResponse, inspectLiveFeedShapes, inspectSellerProfileShapes, type GraphqlCapture } from './graphql.js';
 import { normalizeInput } from './input.js';
 import { sessionsFromEbayLiveFeed, sessionsFromJson } from './parser.js';
@@ -24,6 +25,14 @@ const sources = [
 const requestKey = (request: { id?: string; uniqueKey: string }) => request.id ?? request.uniqueKey;
 const wantsProxy = input.proxyConfiguration.useApifyProxy || input.proxyConfiguration.proxyUrls;
 const proxyConfiguration = wantsProxy ? await Actor.createProxyConfiguration(input.proxyConfiguration) : undefined;
+const brightDataApiKey = process.env.BRIGHT_DATA_API_KEY?.trim();
+const brightDataZone = process.env.BRIGHT_DATA_ZONE?.trim() || 'web_unlocker1';
+const useBrightData = input.enrichProfiles
+    && input.profileEnrichmentMode !== 'direct'
+    && Boolean(brightDataApiKey);
+if (input.profileEnrichmentMode === 'bright_data' && !brightDataApiKey) {
+    throw new Error('profileEnrichmentMode is bright_data, but BRIGHT_DATA_API_KEY is not configured');
+}
 
 const discoveryCrawler = new PlaywrightCrawler({
     maxConcurrency: input.maxConcurrency,
@@ -81,7 +90,36 @@ const candidates = [...grouped.values()]
     .sort((left, right) => right.length - left.length)
     .slice(0, input.maxProfileEnrichmentHosts);
 
-if (input.enrichProfiles && candidates.length) {
+if (useBrightData && candidates.length) {
+    let nextCandidate = 0;
+    const workers = Array.from({ length: Math.min(input.maxProfileConcurrency, candidates.length) }, async () => {
+        while (nextCandidate < candidates.length) {
+            const group = candidates[nextCandidate];
+            nextCandidate += 1;
+            const first = group[0];
+            try {
+                const result = await fetchWithWebUnlocker(first.profile_url, {
+                    apiKey: brightDataApiKey as string,
+                    zone: brightDataZone,
+                    country: input.country,
+                    timeoutMillis: input.navigationTimeoutSecs * 1_000,
+                });
+                const stats = parsePublicProfileText(htmlToVisibleText(result.html));
+                profileStats.set(first.host_id, stats);
+                log.info('Enriched public eBay seller profile through Web Unlocker', {
+                    hostId: first.host_id,
+                    itemsSold: stats.items_sold,
+                    followers: stats.follower_count,
+                    country: stats.seller_country,
+                });
+            } catch (error) {
+                failedProfiles.push(first.host_id);
+                log.warning('Web Unlocker profile enrichment failed', { hostId: first.host_id, error: String(error) });
+            }
+        }
+    });
+    await Promise.all(workers);
+} else if (input.enrichProfiles && candidates.length) {
     const profileCrawler = new PlaywrightCrawler({
         maxConcurrency: input.maxProfileConcurrency,
         maxRequestRetries: input.maxRequestRetries,
@@ -151,6 +189,7 @@ await Actor.setValue('OUTPUT', {
     status: failedSources.length === sources.length ? 'FAILED' : 'SUCCEEDED',
     discovered_sessions: sessions.size,
     profile_enrichment_attempted: input.enrichProfiles ? candidates.length : 0,
+    profile_enrichment_provider: useBrightData ? 'bright_data_web_unlocker' : input.enrichProfiles ? 'direct_browser' : 'disabled',
     profile_enrichment_succeeded: profileStats.size,
     profile_enrichment_failed: failedProfiles.length,
     qualified_leads: leads.length,

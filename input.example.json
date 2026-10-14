@@ -9,6 +9,7 @@
   "minFollowerCount": 0,
   "includeEndedLives": true,
   "enrichProfiles": true,
+  "profileEnrichmentMode": "auto",
   "maxConcurrency": 1,
   "maxProfileConcurrency": 2,
   "maxRequestRetries": 2,
