@@ -5,6 +5,10 @@
   "title": "eBay Live Lead Scraper",
   "description": "Discovers public eBay Live hosts and seller leads.",
   "version": "0.1",
+  "environmentVariables": {
+    "BRIGHT_DATA_API_KEY": "@BRIGHT_DATA_API_KEY",
+    "BRIGHT_DATA_ZONE": "ebay_live_unlocker"
+  },
   "inputSchema": "./input_schema.json",
   "storages": { "dataset": "./dataset_schema.json" },
   "dockerfile": "../Dockerfile",
