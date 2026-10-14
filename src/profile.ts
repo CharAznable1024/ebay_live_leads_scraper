@@ -5,6 +5,7 @@ const COUNTRY_CODES: Record<string, string> = {
     germany: 'DE', deutschland: 'DE', canada: 'CA', australia: 'AU', france: 'FR',
     italy: 'IT', spain: 'ES', japan: 'JP', china: 'CN',
 };
+const COUNTRY_NAMES: Record<string, string> = { US: 'United States', GB: 'United Kingdom', DE: 'Germany', CA: 'Canada', AU: 'Australia', FR: 'France', IT: 'Italy', ES: 'Spain', JP: 'Japan', CN: 'China' };
 
 function compactNumber(raw: string): number | null {
     const normalized = raw.trim().replace(/,/g, '');
@@ -43,11 +44,11 @@ export function parsePublicProfileText(bodyText: string): PublicProfileStats {
     const locationCode = countryCode(rawLocation);
     return {
         feedback_rate: feedbackRate !== null && Number.isFinite(feedbackRate) ? feedbackRate : null,
-        feedback_score: matchNumber(text, [/(?:feedback\s*score|信用评价)\s*[:：]\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:feedback(?:\s+ratings?)?|条信用评价)/i, /\(([\d.,]+\s*[KMB万]?)\)\s*[\d.]+\s*%\s*(?:positive|好评率)/i]),
+        feedback_score: matchNumber(text, [/(?:feedback\s*score|信用评价)\s*[:：]\s*([\d.,]+\s*[KMB万]?)/i, /feedback\s*\(([\d.,]+\s*[KMB万]?)\)/i, /([\d.,]+\s*[KMB万]?)\s+feedback\s+ratings?/i, /\(([\d.,]+\s*[KMB万]?)\)\s*[\d.]+\s*%\s*(?:positive|好评率)/i]),
         items_sold: matchNumber(text, [/([\d.,]+\s*[KMB万]?)\s*(?:items?\s*sold|件物品)/i, /(?:sold|已售出)\s*([\d.,]+\s*[KMB万]?)/i]),
         items_listed: matchNumber(text, [/(?:for sale|在售|选购)\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:items?\s*for sale|件在售)/i]),
         follower_count: matchNumber(text, [/(?:followers?|关注者)\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:followers?|位关注者)/i]),
-        seller_country: locationCode ? rawLocation : null,
+        seller_country: locationCode ? COUNTRY_NAMES[locationCode] ?? rawLocation : null,
         seller_country_code: locationCode,
         stats_source: 'seller_profile',
     };
