@@ -11,6 +11,10 @@ const COUNTRY_CODES: Record<string, string> = {
     意大利: 'IT', 西班牙: 'ES', 日本: 'JP', 中国: 'CN', 瑞典: 'SE', 瑞士: 'CH',
     荷兰: 'NL', 比利时: 'BE', 奥地利: 'AT', 丹麦: 'DK', 挪威: 'NO', 芬兰: 'FI',
     爱尔兰: 'IE', 葡萄牙: 'PT', 波兰: 'PL', 新加坡: 'SG', 香港: 'HK', 台湾: 'TW', 韩国: 'KR',
+    frankreich: 'FR', italien: 'IT', spanien: 'ES', schweden: 'SE', niederlande: 'NL', belgien: 'BE',
+    österreich: 'AT', dänemark: 'DK', finnland: 'FI', irland: 'IE', polen: 'PL', tschechien: 'CZ',
+    ungarn: 'HU', rumänien: 'RO', slowakei: 'SK', slowenien: 'SI', kroatien: 'HR', bulgarien: 'BG',
+    griechenland: 'GR', zypern: 'CY', estland: 'EE', lettland: 'LV', litauen: 'LT', luxemburg: 'LU',
 };
 const COUNTRY_NAMES: Record<string, string> = { US: 'United States', GB: 'United Kingdom', DE: 'Germany', CA: 'Canada', AU: 'Australia', FR: 'France', IT: 'Italy', ES: 'Spain', JP: 'Japan', CN: 'China', SE: 'Sweden', CH: 'Switzerland', NL: 'Netherlands', BE: 'Belgium', AT: 'Austria', DK: 'Denmark', NO: 'Norway', FI: 'Finland', IE: 'Ireland', PT: 'Portugal', PL: 'Poland', SG: 'Singapore', HK: 'Hong Kong', TW: 'Taiwan', KR: 'South Korea' };
 
@@ -55,7 +59,7 @@ export function parsePublicProfileText(bodyText: string): PublicProfileStats {
     const text = bodyText.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ');
     const feedbackRateText = text.match(/([\d.]+)\s*%\s*(?:positive|好评率)/i)?.[1];
     const feedbackRate = feedbackRateText ? Number(feedbackRateText) : null;
-    const rawLocation = text.match(/(?:located in|location|所在地|位于)\s*[:：]?\s*([^|•\n]{2,100})/i)?.[1]?.trim() ?? null;
+    const rawLocation = text.match(/(?:located in|location|所在地|位于|standort)\s*[:：]?\s*([^|•\n]{2,100})/i)?.[1]?.trim() ?? null;
     const locationCode = countryCode(rawLocation);
     return {
         feedback_rate: feedbackRate !== null && Number.isFinite(feedbackRate) ? feedbackRate : null,

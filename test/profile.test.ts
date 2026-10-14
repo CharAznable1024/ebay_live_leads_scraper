@@ -29,6 +29,11 @@ describe('public eBay seller profile parser', () => {
         expect(parsePublicProfileText('所在地：瑞典 注册时间：2009 年 05 月 04 日')).toMatchObject({ seller_country: 'Sweden', seller_country_code: 'SE' });
     });
 
+    it('maps German About locations to ISO codes', () => {
+        expect(parsePublicProfileText('Standort: Deutschland Mitglied seit: 2021')).toMatchObject({ seller_country: 'Germany', seller_country_code: 'DE' });
+        expect(parsePublicProfileText('Standort: Schweden Mitglied seit: 2021')).toMatchObject({ seller_country: 'Sweden', seller_country_code: 'SE' });
+    });
+
     it('finds the public About tab and merges its location', () => {
         expect(findAboutUrl('<a href="/about">About eBay</a><a href="/str/store/about">About</a>', 'https://www.ebay.com/usr/seller', 'seller')).toBe('https://www.ebay.com/str/store/about');
         expect(findAboutUrl('<link rel="canonical" href="https://www.ebay.com/str/luckyvaultus">', 'https://www.ebay.com/usr/luckyvaultus', 'luckyvaultus')).toBe('https://www.ebay.com/str/luckyvaultus?_tab=about');
