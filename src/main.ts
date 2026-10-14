@@ -53,7 +53,14 @@ const discoveryCrawler = new PlaywrightCrawler({
         graphqlCaptures.set(requestKey(request), captures);
     }],
     requestHandler: async ({ page, request }) => {
-        await page.waitForTimeout(4_000);
+        // The initial feed is sometimes requested only after the page becomes
+        // interactive. Scroll through enough public cards to trigger bounded
+        // GetNextFilterFeed pagination before collecting captured responses.
+        const scrollRounds = Math.min(5, Math.max(1, Math.ceil(input.maxLiveSessions / 20)));
+        for (let round = 0; round < scrollRounds; round += 1) {
+            await page.waitForTimeout(round === 0 ? 3_000 : 1_500);
+            await page.evaluate(() => window.scrollBy(0, Math.max(window.innerHeight * 4, document.body.scrollHeight)));
+        }
         const graphql = (await Promise.all(graphqlCaptures.get(requestKey(request)) ?? []))
             .filter((item): item is GraphqlCapture => item !== null);
         const scripts = await page.locator('script[type="application/ld+json"],script#__NEXT_DATA__').allTextContents();
@@ -73,7 +80,7 @@ const discoveryCrawler = new PlaywrightCrawler({
             seller_profile_shapes: inspectSellerProfileShapes(capture.response),
         }));
         await Actor.setValue(`GRAPHQL_${request.id ?? request.uniqueKey}`, operations);
-        log.info('Processed eBay Live discovery source', { source: request.userData.source, sessions: sessions.size });
+        log.info('Processed eBay Live discovery source', { source: request.userData.source, graphqlResponses: graphql.length, sessions: sessions.size });
     },
     failedRequestHandler: ({ request }) => {
         failedSources.push(request.url);
