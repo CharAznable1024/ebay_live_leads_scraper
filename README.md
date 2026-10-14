@@ -9,6 +9,7 @@ Custom Apify Actor for public eBay Live host and seller discovery. It outputs on
 - Qualification: optional public host-country and follower thresholds.
 - Profile enrichment: visits each selected public seller profile once to collect published feedback rate, items sold, followers, and About-page location.
 - Output: seller/host name, profile URL, public country, feedback rate and detailed seller ratings, sold/listed counts when published, follower count, live-session count, and up to three sampled categories/brands.
+- Country filtering: pass ISO codes in `sellerCountries` (for example `["DE", "FR"]`) or `["EU"]` for the 27 European Union member states. The Actor verifies country from the public Store About tab before emitting a filtered lead.
 
 When a public profile does not expose a metric, the Actor emits `null` rather than inferring it. No login or private-contact collection is used.
 

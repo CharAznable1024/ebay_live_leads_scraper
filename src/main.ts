@@ -108,7 +108,13 @@ for (const session of sessions.values()) {
 }
 
 const seedHostIds = new Set(input.sellerUsernames.map((username) => username.toLowerCase()));
-const candidates = [...grouped.values()]
+const countryEligibleGroups = [...grouped.values()].filter((group) => {
+    const discoveredCountry = group[0].seller_country_code?.toUpperCase();
+    // Unknown country must be verified from the public About page. Known
+    // non-matching countries can be discarded before profile enrichment.
+    return !input.sellerCountries.length || !discoveredCountry || input.sellerCountries.includes(discoveredCountry);
+});
+const candidates = countryEligibleGroups
     // Explicit usernames are intentional enrichment targets, so do not let a
     // concurrently sampled Live card displace them when the profile limit is low.
     .sort((left, right) => {

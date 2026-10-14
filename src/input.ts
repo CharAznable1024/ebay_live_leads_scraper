@@ -1,11 +1,19 @@
 import type { ActorInput, DedupeMode, Input, Marketplace, ProfileEnrichmentMode } from './types.js';
 const markets = new Set<Marketplace>(['US', 'GB', 'DE', 'AU', 'CA']);
+// EU member states (not the wider EEA): use the `EU` input value as a
+// convenience filter and retain concrete ISO codes internally.
+const EU_COUNTRY_CODES = [
+  'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU',
+  'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE',
+];
 const list = (value: unknown, fallback: string[], field: string) => { const raw = value === undefined ? fallback : value; if (!Array.isArray(raw)) throw new Error(`${field} must be an array`); return [...new Set(raw.map((v) => typeof v === 'string' ? v.trim() : v && typeof v === 'object' && typeof (v as { url?: unknown }).url === 'string' ? (v as { url: string }).url.trim() : '').filter(Boolean))]; };
 const integer = (value: unknown, fallback: number, min: number, max: number, field: string) => { const v = value === undefined ? fallback : value; if (!Number.isInteger(v) || (v as number) < min || (v as number) > max) throw new Error(`${field} must be an integer between ${min} and ${max}`); return v as number; };
 const bool = (value: unknown, fallback: boolean, field: string) => { const v = value === undefined ? fallback : value; if (typeof v !== 'boolean') throw new Error(`${field} must be a boolean`); return v; };
 export function normalizeInput(raw: ActorInput | null | undefined): Input {
   const data = raw ?? {}; const country = (data.country ?? 'US') as Marketplace; if (!markets.has(country)) throw new Error('Unsupported country');
-  const sellerCountries = list(data.sellerCountries, [], 'sellerCountries').map((v) => v.toUpperCase()); if (sellerCountries.some((v) => !/^[A-Z]{2}$/.test(v))) throw new Error('sellerCountries must contain ISO alpha-2 codes');
+  const countryFilters = list(data.sellerCountries, [], 'sellerCountries').map((v) => v.toUpperCase());
+  if (countryFilters.some((v) => v !== 'EU' && !/^[A-Z]{2}$/.test(v))) throw new Error('sellerCountries must contain ISO alpha-2 codes or EU');
+  const sellerCountries = [...new Set(countryFilters.flatMap((value) => value === 'EU' ? EU_COUNTRY_CODES : value))];
   const dedupeMode = (data.dedupeMode ?? 'new_and_updated') as DedupeMode; if (!['all', 'new_only', 'new_and_updated'].includes(dedupeMode)) throw new Error('Invalid dedupeMode');
   const startUrls = list(data.startUrls, [], 'startUrls'); for (const url of startUrls) { const parsed = new URL(url); if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('ebay.com')) throw new Error('startUrls must be public HTTPS ebay.com URLs'); }
   const maxSellers = integer(data.maxSellers, 50, 1, 200, 'maxSellers'); const maxProfileEnrichmentHosts = integer(data.maxProfileEnrichmentHosts, maxSellers, 1, 200, 'maxProfileEnrichmentHosts');
