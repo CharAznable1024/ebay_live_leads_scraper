@@ -42,6 +42,7 @@ export function parsePublicProfileText(bodyText: string): PublicProfileStats {
     const location = text.match(/(?:located in|location|所在地|位于)\s*[:：]?\s*([^|•\n]{2,100})/i)?.[1]?.trim() ?? null;
     return {
         feedback_rate: feedbackRate !== null && Number.isFinite(feedbackRate) ? feedbackRate : null,
+        feedback_score: matchNumber(text, [/(?:feedback\s*(?:score)?|信用评价)\s*[:：]?\s*([\d.,]+\s*[KMB万]?)/i, /\(([\d.,]+\s*[KMB万]?)\)\s*[\d.]+\s*%\s*(?:positive|好评率)/i]),
         items_sold: matchNumber(text, [/([\d.,]+\s*[KMB万]?)\s*(?:items?\s*sold|件物品)/i, /(?:sold|已售出)\s*([\d.,]+\s*[KMB万]?)/i]),
         items_listed: matchNumber(text, [/(?:for sale|在售|选购)\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:items?\s*for sale|件在售)/i]),
         follower_count: matchNumber(text, [/(?:followers?|关注者)\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:followers?|位关注者)/i]),
@@ -49,6 +50,16 @@ export function parsePublicProfileText(bodyText: string): PublicProfileStats {
         seller_country_code: countryCode(location),
         stats_source: 'seller_profile',
     };
+}
+
+export function findFeedbackUrl(html: string, profileUrl: string, username: string): string {
+    const anchor = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    for (const match of html.matchAll(anchor)) {
+        const href = match[1].replace(/&amp;/gi, '&');
+        const label = match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (/feedback|信用评价/i.test(label) || /\/fdbk\/feedback_profile\//i.test(href)) return new URL(href, profileUrl).toString();
+    }
+    return `https://www.ebay.com/fdbk/feedback_profile/${encodeURIComponent(username)}`;
 }
 
 /** Finds the public About tab URL rendered in an eBay Store profile. */
@@ -70,6 +81,7 @@ export function findAboutUrl(html: string, profileUrl: string, username: string)
 export function mergePublicProfileStats(primary: PublicProfileStats, about: PublicProfileStats): PublicProfileStats {
     return {
         feedback_rate: primary.feedback_rate ?? about.feedback_rate,
+        feedback_score: primary.feedback_score ?? about.feedback_score,
         items_sold: primary.items_sold ?? about.items_sold,
         items_listed: primary.items_listed ?? about.items_listed,
         follower_count: primary.follower_count ?? about.follower_count,

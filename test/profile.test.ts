@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { findAboutUrl, mergePublicProfileStats, parsePublicProfileText } from '../src/profile.js';
+import { findAboutUrl, findFeedbackUrl, mergePublicProfileStats, parsePublicProfileText } from '../src/profile.js';
 
 describe('public eBay seller profile parser', () => {
     it('parses English public seller metrics and location', () => {
@@ -25,5 +25,10 @@ describe('public eBay seller profile parser', () => {
         const primary = parsePublicProfileText('99.9% positive 18K items sold 4.5K followers');
         const about = parsePublicProfileText('Located in: United States Member since 2020');
         expect(mergePublicProfileStats(primary, about)).toMatchObject({ items_sold: 18_000, follower_count: 4_500, seller_country_code: 'US' });
+    });
+
+    it('finds and parses public feedback score', () => {
+        expect(findFeedbackUrl('<a href="/fdbk/feedback_profile/seller">Feedback</a>', 'https://www.ebay.com/usr/seller', 'seller')).toBe('https://www.ebay.com/fdbk/feedback_profile/seller');
+        expect(parsePublicProfileText('Feedback score: 12,345 99.9% positive feedback')).toMatchObject({ feedback_score: 12_345, feedback_rate: 99.9 });
     });
 });

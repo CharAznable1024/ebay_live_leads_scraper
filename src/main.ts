@@ -5,7 +5,7 @@ import { fetchWithWebUnlocker, htmlToVisibleText, inspectUnlockedHtml } from './
 import { captureGraphqlResponse, inspectGraphqlResponse, inspectLiveFeedShapes, inspectSellerProfileShapes, type GraphqlCapture } from './graphql.js';
 import { normalizeInput } from './input.js';
 import { sessionsFromEbayLiveFeed, sessionsFromJson } from './parser.js';
-import { findAboutUrl, mergePublicProfileStats, parsePublicProfileText } from './profile.js';
+import { findAboutUrl, findFeedbackUrl, mergePublicProfileStats, parsePublicProfileText } from './profile.js';
 import type { ActorInput, Lead, LiveSession, PublicProfileStats } from './types.js';
 
 await Actor.init();
@@ -17,6 +17,8 @@ const failedSources: string[] = [];
 const failedProfiles: string[] = [];
 let aboutEnrichmentAttempted = 0;
 let aboutEnrichmentSucceeded = 0;
+let feedbackEnrichmentAttempted = 0;
+let feedbackEnrichmentSucceeded = 0;
 const graphqlCaptures = new Map<string, Promise<GraphqlCapture | null>[]>();
 const defaultUrl = 'https://www.ebay.com/ebaylive/';
 const sourceUrls = input.startUrls.length ? input.startUrls : [defaultUrl];
@@ -146,6 +148,24 @@ if (useBrightData && candidates.length) {
                         log.warning('Web Unlocker About enrichment failed', { hostId: first.host_id, aboutUrl, error: String(error) });
                     }
                 }
+                if (stats.feedback_score === null) {
+                    feedbackEnrichmentAttempted += 1;
+                    const username = first.host_name ?? first.host_id;
+                    const feedbackUrl = findFeedbackUrl(result.html, first.profile_url, username);
+                    try {
+                        const feedbackResult = await fetchWithWebUnlocker(feedbackUrl, {
+                            apiKey: brightDataApiKey as string, zone: brightDataZone, country: input.country,
+                            timeoutMillis: input.navigationTimeoutSecs * 1_000,
+                        });
+                        await Actor.setValue(`UNLOCKER_FEEDBACK_DEBUG_${first.host_id}`, inspectUnlockedHtml(feedbackResult.html, username, feedbackResult));
+                        if (!feedbackResult.html.trim()) throw new Error(`Web Unlocker returned an empty Feedback body with HTTP ${feedbackResult.status_code}`);
+                        const feedbackStats = parsePublicProfileText(htmlToVisibleText(feedbackResult.html));
+                        stats = mergePublicProfileStats(stats, feedbackStats);
+                        if (feedbackStats.feedback_score !== null || feedbackStats.feedback_rate !== null) feedbackEnrichmentSucceeded += 1;
+                    } catch (error) {
+                        log.warning('Web Unlocker Feedback enrichment failed', { hostId: first.host_id, feedbackUrl, error: String(error) });
+                    }
+                }
                 profileStats.set(first.host_id, stats);
                 log.info('Enriched public eBay seller profile through Web Unlocker', {
                     hostId: first.host_id,
@@ -208,6 +228,7 @@ const leads: Lead[] = candidates.map((group): Lead => {
         items_listed: stats?.items_listed ?? null,
         follower_count: followerCount,
         feedback_rate: stats?.feedback_rate ?? null,
+        feedback_score: stats?.feedback_score ?? null,
         seller_stats_source: stats ? 'seller_profile' : 'live_event',
         live_session_count: group.length,
         live_status: statuses,
@@ -235,6 +256,8 @@ await Actor.setValue('OUTPUT', {
     profile_enrichment_failed: failedProfiles.length,
     profile_about_enrichment_attempted: aboutEnrichmentAttempted,
     profile_about_enrichment_succeeded: aboutEnrichmentSucceeded,
+    profile_feedback_enrichment_attempted: feedbackEnrichmentAttempted,
+    profile_feedback_enrichment_succeeded: feedbackEnrichmentSucceeded,
     qualified_leads: leads.length,
     failed_sources: failedSources,
     scraped_at: scrapedAt,
