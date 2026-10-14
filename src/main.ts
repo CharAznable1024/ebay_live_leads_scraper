@@ -121,8 +121,9 @@ if (useBrightData && candidates.length) {
                     country: input.country,
                     timeoutMillis: input.navigationTimeoutSecs * 1_000,
                 });
+                await Actor.setValue(`UNLOCKER_DEBUG_${first.host_id}`, inspectUnlockedHtml(result.html, first.host_name ?? first.host_id, result));
+                if (!result.html.trim()) throw new Error(`Web Unlocker returned an empty body with HTTP ${result.status_code}`);
                 const stats = parsePublicProfileText(htmlToVisibleText(result.html));
-                await Actor.setValue(`UNLOCKER_DEBUG_${first.host_id}`, inspectUnlockedHtml(result.html, first.host_name ?? first.host_id));
                 profileStats.set(first.host_id, stats);
                 log.info('Enriched public eBay seller profile through Web Unlocker', {
                     hostId: first.host_id,

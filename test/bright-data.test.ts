@@ -22,8 +22,8 @@ describe('Bright Data Web Unlocker client', () => {
     });
 
     it('creates a bounded unlock diagnostic without retaining full HTML', () => {
-        expect(inspectUnlockedHtml('<title>Seller</title><div>purecrystalhub profile</div>', 'purecrystalhub')).toMatchObject({
-            title: 'Seller', contains_seller_username: true, contains_captcha_or_error: false,
+        expect(inspectUnlockedHtml('<title>Seller</title><div>purecrystalhub profile</div>', 'purecrystalhub', { status_code: 200 })).toMatchObject({
+            title: 'Seller', status_code: 200, contains_seller_username: true, contains_captcha_or_error: false,
         });
     });
 });
