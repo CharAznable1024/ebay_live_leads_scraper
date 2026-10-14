@@ -35,6 +35,14 @@ function matchNumber(text: string, expressions: RegExp[]): number | null {
     return null;
 }
 
+function matchDecimal(text: string, expressions: RegExp[]): number | null {
+    for (const expression of expressions) {
+        const raw = text.match(expression)?.[1];
+        if (raw) { const value = Number(raw); if (Number.isFinite(value)) return value; }
+    }
+    return null;
+}
+
 function countryCode(location: string | null): string | null {
     if (!location) return null;
     const lower = location.toLowerCase();
@@ -52,6 +60,13 @@ export function parsePublicProfileText(bodyText: string): PublicProfileStats {
     return {
         feedback_rate: feedbackRate !== null && Number.isFinite(feedbackRate) ? feedbackRate : null,
         feedback_score: matchNumber(text, [/(?:feedback\s*score|信用评价)\s*[:：]\s*([\d.,]+\s*[KMB万]?)/i, /feedback\s*\(([\d.,]+\s*[KMB万]?)\)/i, /([\d.,]+\s*[KMB万]?)\s+feedback\s+ratings?/i, /\(([\d.,]+\s*[KMB万]?)\)\s*[\d.]+\s*%\s*(?:positive|好评率)/i]),
+        feedback_positive_12m: matchNumber(text, [/(?:Positive|好评)\s*([\d,]+)/i]),
+        feedback_neutral_12m: matchNumber(text, [/(?:Neutral|中评)\s*([\d,]+)/i]),
+        feedback_negative_12m: matchNumber(text, [/(?:Negative|差评)\s*([\d,]+)/i]),
+        rating_accurate_description: matchDecimal(text, [/(?:Accurate description|描述准确性)\s*([\d.]+)/i]),
+        rating_shipping_cost: matchDecimal(text, [/(?:Reasonable shipping cost|合理的运费)\s*([\d.]+)/i]),
+        rating_shipping_speed: matchDecimal(text, [/(?:Shipping speed|发货速度)\s*([\d.]+)/i]),
+        rating_communication: matchDecimal(text, [/(?:Communication|沟通)\s*([\d.]+)/i]),
         items_sold: matchNumber(text, [/([\d.,]+\s*[KMB万]?)\s*(?:items?\s*sold|件物品)/i, /(?:sold|已售出)\s*([\d.,]+\s*[KMB万]?)/i]),
         items_listed: matchNumber(text, [/(?:for sale|在售|选购)\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:items?\s*for sale|件在售)/i]),
         follower_count: matchNumber(text, [/(?:followers?|关注者)\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:followers?|位关注者)/i]),
@@ -93,6 +108,13 @@ export function mergePublicProfileStats(primary: PublicProfileStats, about: Publ
     return {
         feedback_rate: primary.feedback_rate ?? about.feedback_rate,
         feedback_score: primary.feedback_score ?? about.feedback_score,
+        feedback_positive_12m: primary.feedback_positive_12m ?? about.feedback_positive_12m,
+        feedback_neutral_12m: primary.feedback_neutral_12m ?? about.feedback_neutral_12m,
+        feedback_negative_12m: primary.feedback_negative_12m ?? about.feedback_negative_12m,
+        rating_accurate_description: primary.rating_accurate_description ?? about.rating_accurate_description,
+        rating_shipping_cost: primary.rating_shipping_cost ?? about.rating_shipping_cost,
+        rating_shipping_speed: primary.rating_shipping_speed ?? about.rating_shipping_speed,
+        rating_communication: primary.rating_communication ?? about.rating_communication,
         items_sold: primary.items_sold ?? about.items_sold,
         items_listed: primary.items_listed ?? about.items_listed,
         follower_count: primary.follower_count ?? about.follower_count,

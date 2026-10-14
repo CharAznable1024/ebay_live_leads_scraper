@@ -164,7 +164,7 @@ if (useBrightData && candidates.length) {
                         if (!feedbackResult.html.trim()) throw new Error(`Web Unlocker returned an empty Feedback body with HTTP ${feedbackResult.status_code}`);
                         const feedbackStats = parsePublicProfileText(htmlToVisibleText(feedbackResult.html));
                         stats = mergePublicProfileStats(stats, feedbackStats);
-                        if (feedbackStats.feedback_score !== null || feedbackStats.feedback_rate !== null) feedbackEnrichmentSucceeded += 1;
+                        if (feedbackStats.feedback_score !== null || feedbackStats.feedback_rate !== null || feedbackStats.feedback_positive_12m !== null) feedbackEnrichmentSucceeded += 1;
                     } catch (error) {
                         log.warning('Web Unlocker Feedback enrichment failed', { hostId: first.host_id, feedbackUrl, error: String(error) });
                     }
@@ -232,6 +232,13 @@ const leads: Lead[] = candidates.map((group): Lead => {
         follower_count: followerCount,
         feedback_rate: stats?.feedback_rate ?? null,
         feedback_score: stats?.feedback_score ?? null,
+        feedback_positive_12m: stats?.feedback_positive_12m ?? null,
+        feedback_neutral_12m: stats?.feedback_neutral_12m ?? null,
+        feedback_negative_12m: stats?.feedback_negative_12m ?? null,
+        rating_accurate_description: stats?.rating_accurate_description ?? null,
+        rating_shipping_cost: stats?.rating_shipping_cost ?? null,
+        rating_shipping_speed: stats?.rating_shipping_speed ?? null,
+        rating_communication: stats?.rating_communication ?? null,
         seller_stats_source: stats ? 'seller_profile' : 'live_event',
         live_session_count: group.length,
         live_status: statuses,

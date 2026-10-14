@@ -41,4 +41,9 @@ describe('public eBay seller profile parser', () => {
         expect(parsePublicProfileText('Feedback score: 12,345 99.9% positive feedback')).toMatchObject({ feedback_score: 12_345, feedback_rate: 99.9 });
         expect(parsePublicProfileText('99.9% positive feedback 18K items sold')).toMatchObject({ feedback_score: null, items_sold: 18_000 });
     });
+
+    it('parses detailed seller feedback ratings', () => {
+        const stats = parsePublicProfileText('Feedback ratings Last 12 months Positive 16,391 Neutral 37 Negative 6 Detailed seller ratings Accurate description 4.9 Reasonable shipping cost 5.0 Shipping speed 5.0 Communication 5.0');
+        expect(stats).toMatchObject({ feedback_positive_12m: 16_391, feedback_neutral_12m: 37, feedback_negative_12m: 6, rating_accurate_description: 4.9, rating_shipping_cost: 5, rating_shipping_speed: 5, rating_communication: 5 });
+    });
 });
