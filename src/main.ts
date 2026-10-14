@@ -79,6 +79,23 @@ const discoveryCrawler = new PlaywrightCrawler({
 
 await discoveryCrawler.run(sources);
 
+for (const username of input.sellerUsernames) {
+    sessions.set(`seed:${username}`, {
+        host_id: username,
+        host_name: username,
+        profile_url: `https://www.ebay.com/usr/${encodeURIComponent(username)}`,
+        live_url: defaultUrl,
+        title: null,
+        status: 'UNKNOWN',
+        starts_at: null,
+        seller_country: null,
+        seller_country_code: null,
+        follower_count: null,
+        category: null,
+        brand: null,
+    });
+}
+
 const grouped = new Map<string, LiveSession[]>();
 for (const session of sessions.values()) {
     const group = grouped.get(session.host_id) ?? [];

@@ -1,6 +1,7 @@
 {
   "searchQueries": [],
   "startUrls": ["https://www.ebay.com/ebaylive/"],
+  "sellerUsernames": [],
   "country": "US",
   "sellerCountries": [],
   "maxLiveSessions": 100,
