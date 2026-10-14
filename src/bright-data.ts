@@ -92,6 +92,18 @@ export function htmlToVisibleText(html: string): string {
 
 export function inspectUnlockedHtml(html: string, sellerUsername: string, metadata?: Partial<WebUnlockerResult>) {
     const visibleText = htmlToVisibleText(html);
+    // eBay changes the Store navigation often. Keep a bounded, structure-neutral
+    // sample of every location signal so parsers can be fixed from evidence,
+    // rather than by inventing another page route.
+    const locationEvidence = [...html.matchAll(/所在地|位于|located\s+in|seller[_-]?location|user[_-]?location|location|country/gi)]
+        .map((match) => {
+            const start = Math.max(0, (match.index ?? 0) - 180);
+            const end = Math.min(html.length, (match.index ?? 0) + 360);
+            return htmlToVisibleText(html.slice(start, end)).slice(0, 450);
+        })
+        .filter((snippet) => snippet.length > 0)
+        .filter((snippet, index, values) => values.indexOf(snippet) === index)
+        .slice(0, 40);
     const links = [...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
         .map((match) => ({ href: match[1].replace(/&amp;/gi, '&'), label: match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) }))
         .filter((link) => /about|关于|\/str\//i.test(`${link.href} ${link.label}`))
@@ -103,6 +115,7 @@ export function inspectUnlockedHtml(html: string, sellerUsername: string, metada
         bright_data_error: metadata?.bright_data_error ?? null,
         canonical_url: html.match(/<link\b[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i)?.[1] ?? null,
         about_link_candidates: links,
+        location_evidence: locationEvidence,
         title: html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, ' ').trim() ?? null,
         contains_seller_username: visibleText.toLowerCase().includes(sellerUsername.toLowerCase()),
         contains_captcha_or_error: /captcha|robot|something went wrong|access denied|verify you are human/i.test(visibleText),

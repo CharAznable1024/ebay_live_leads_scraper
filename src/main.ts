@@ -107,8 +107,15 @@ for (const session of sessions.values()) {
     grouped.set(session.host_id, group);
 }
 
+const seedHostIds = new Set(input.sellerUsernames.map((username) => username.toLowerCase()));
 const candidates = [...grouped.values()]
-    .sort((left, right) => right.length - left.length)
+    // Explicit usernames are intentional enrichment targets, so do not let a
+    // concurrently sampled Live card displace them when the profile limit is low.
+    .sort((left, right) => {
+        const leftIsSeed = seedHostIds.has(left[0].host_id.toLowerCase());
+        const rightIsSeed = seedHostIds.has(right[0].host_id.toLowerCase());
+        return Number(rightIsSeed) - Number(leftIsSeed) || right.length - left.length;
+    })
     .slice(0, input.maxProfileEnrichmentHosts);
 
 if (useBrightData && candidates.length) {
@@ -150,7 +157,17 @@ if (useBrightData && candidates.length) {
                         log.warning('Web Unlocker About enrichment failed', { hostId: first.host_id, aboutUrl, error: String(error) });
                     }
                 }
-                if (stats.feedback_score === null) {
+                const needsFeedbackEnrichment = [
+                    stats.feedback_score,
+                    stats.feedback_positive_12m,
+                    stats.feedback_neutral_12m,
+                    stats.feedback_negative_12m,
+                    stats.rating_accurate_description,
+                    stats.rating_shipping_cost,
+                    stats.rating_shipping_speed,
+                    stats.rating_communication,
+                ].some((value) => value === null);
+                if (needsFeedbackEnrichment) {
                     feedbackEnrichmentAttempted += 1;
                     const username = first.host_name ?? first.host_id;
                     const feedbackUrl = findFeedbackUrl(result.html, first.profile_url, username);
@@ -219,7 +236,7 @@ const leads: Lead[] = candidates.map((group): Lead => {
     );
     return {
         record_type: 'ebay_live_host_lead',
-        schema_version: '1.1',
+        schema_version: '1.2',
         platform: 'ebay_live',
         seller_id: first.host_id,
         seller_name: first.host_name,
@@ -241,9 +258,8 @@ const leads: Lead[] = candidates.map((group): Lead => {
         rating_communication: stats?.rating_communication ?? null,
         seller_stats_source: stats ? 'seller_profile' : 'live_event',
         live_session_count: group.length,
-        live_status: statuses,
         next_live_at: group.filter((session) => session.status === 'UPCOMING').map((session) => session.starts_at).filter(Boolean).sort()[0] ?? null,
-        categories: [...new Set(group.map((session) => session.category).filter(Boolean) as string[])],
+        categories: [...new Set(group.map((session) => session.category).filter(Boolean) as string[])].slice(0, 3),
         brands: [...new Set(group.map((session) => session.brand).filter(Boolean) as string[])],
         sample_live_urls: [...new Set(group.map((session) => session.live_url))].slice(0, 5),
         lead_score: score,

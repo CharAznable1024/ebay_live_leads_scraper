@@ -80,13 +80,19 @@ export function findFeedbackUrl(html: string, profileUrl: string, username: stri
     const anchor = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
     for (const match of html.matchAll(anchor)) {
         const href = match[1].replace(/&amp;/gi, '&');
-        const label = match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-        if (/feedback|信用评价/i.test(label) || /\/fdbk\/feedback_profile\//i.test(href)) return new URL(href, profileUrl).toString();
+        if (/\/str\/[^?#]+[?&#](?:tab|_tab)=feedback/i.test(href)) return new URL(href, profileUrl).toString();
     }
-    return `https://www.ebay.com/fdbk/feedback_profile/${encodeURIComponent(username)}`;
+    const canonical = html.match(/<link\b[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i)?.[1]
+        ?? html.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*rel=["']canonical["']/i)?.[1];
+    const storefront = canonical && /\/str\/[^/?#]+/i.test(canonical)
+        ? new URL(canonical, profileUrl).toString()
+        : `https://www.ebay.com/str/${encodeURIComponent(username)}`;
+    const feedback = new URL(storefront);
+    feedback.searchParams.set('_tab', 'feedback');
+    return feedback.toString();
 }
 
-/** Finds the public About tab URL rendered in an eBay Store profile. */
+/** Resolves the public Store About tab URL used by eBay storefronts. */
 export function findAboutUrl(html: string, profileUrl: string, username: string): string {
     const anchor = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
     for (const match of html.matchAll(anchor)) {
@@ -100,8 +106,12 @@ export function findAboutUrl(html: string, profileUrl: string, username: string)
     }
     const canonical = html.match(/<link\b[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i)?.[1]
         ?? html.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*rel=["']canonical["']/i)?.[1];
-    if (canonical && /\/str\//i.test(canonical)) return `${canonical.replace(/\/$/, '')}/about`;
-    return `https://www.ebay.com/str/${encodeURIComponent(username)}/about`;
+    const storefront = canonical && /\/str\/[^/?#]+/i.test(canonical)
+        ? new URL(canonical, profileUrl).toString()
+        : `https://www.ebay.com/str/${encodeURIComponent(username)}`;
+    const about = new URL(storefront);
+    about.searchParams.set('_tab', 'about');
+    return about.toString();
 }
 
 export function mergePublicProfileStats(primary: PublicProfileStats, about: PublicProfileStats): PublicProfileStats {
