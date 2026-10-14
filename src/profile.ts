@@ -42,7 +42,7 @@ export function parsePublicProfileText(bodyText: string): PublicProfileStats {
     const location = text.match(/(?:located in|location|所在地|位于)\s*[:：]?\s*([^|•\n]{2,100})/i)?.[1]?.trim() ?? null;
     return {
         feedback_rate: feedbackRate !== null && Number.isFinite(feedbackRate) ? feedbackRate : null,
-        feedback_score: matchNumber(text, [/(?:feedback\s*(?:score)?|信用评价)\s*[:：]?\s*([\d.,]+\s*[KMB万]?)/i, /\(([\d.,]+\s*[KMB万]?)\)\s*[\d.]+\s*%\s*(?:positive|好评率)/i]),
+        feedback_score: matchNumber(text, [/(?:feedback\s*score|信用评价)\s*[:：]\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:feedback(?:\s+ratings?)?|条信用评价)/i, /\(([\d.,]+\s*[KMB万]?)\)\s*[\d.]+\s*%\s*(?:positive|好评率)/i]),
         items_sold: matchNumber(text, [/([\d.,]+\s*[KMB万]?)\s*(?:items?\s*sold|件物品)/i, /(?:sold|已售出)\s*([\d.,]+\s*[KMB万]?)/i]),
         items_listed: matchNumber(text, [/(?:for sale|在售|选购)\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:items?\s*for sale|件在售)/i]),
         follower_count: matchNumber(text, [/(?:followers?|关注者)\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:followers?|位关注者)/i]),
@@ -68,7 +68,9 @@ export function findAboutUrl(html: string, profileUrl: string, username: string)
     for (const match of html.matchAll(anchor)) {
         const href = match[1].replace(/&amp;/gi, '&');
         const label = match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-        if (/\babout\b|关于/i.test(label) || /(?:\/about(?:[/?#]|$)|[?&#](?:tab|_tab)=about)/i.test(href)) {
+        const storeAboutHref = /\/str\/[^/?#]+\/about(?:[/?#]|$)|\/str\/[^?#]+[?&#](?:tab|_tab)=about/i.test(href);
+        const storeAboutLabel = /\babout\b|关于/i.test(label) && /\/str\//i.test(href);
+        if (storeAboutHref || storeAboutLabel) {
             return new URL(href, profileUrl).toString();
         }
     }
