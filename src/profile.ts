@@ -4,8 +4,15 @@ const COUNTRY_CODES: Record<string, string> = {
     'united states': 'US', usa: 'US', 'united kingdom': 'GB', uk: 'GB', england: 'GB',
     germany: 'DE', deutschland: 'DE', canada: 'CA', australia: 'AU', france: 'FR',
     italy: 'IT', spain: 'ES', japan: 'JP', china: 'CN',
+    sweden: 'SE', switzerland: 'CH', netherlands: 'NL', belgium: 'BE', austria: 'AT',
+    denmark: 'DK', norway: 'NO', finland: 'FI', ireland: 'IE', portugal: 'PT',
+    poland: 'PL', singapore: 'SG', 'hong kong': 'HK', taiwan: 'TW', korea: 'KR',
+    美国: 'US', 英国: 'GB', 德国: 'DE', 加拿大: 'CA', 澳大利亚: 'AU', 法国: 'FR',
+    意大利: 'IT', 西班牙: 'ES', 日本: 'JP', 中国: 'CN', 瑞典: 'SE', 瑞士: 'CH',
+    荷兰: 'NL', 比利时: 'BE', 奥地利: 'AT', 丹麦: 'DK', 挪威: 'NO', 芬兰: 'FI',
+    爱尔兰: 'IE', 葡萄牙: 'PT', 波兰: 'PL', 新加坡: 'SG', 香港: 'HK', 台湾: 'TW', 韩国: 'KR',
 };
-const COUNTRY_NAMES: Record<string, string> = { US: 'United States', GB: 'United Kingdom', DE: 'Germany', CA: 'Canada', AU: 'Australia', FR: 'France', IT: 'Italy', ES: 'Spain', JP: 'Japan', CN: 'China' };
+const COUNTRY_NAMES: Record<string, string> = { US: 'United States', GB: 'United Kingdom', DE: 'Germany', CA: 'Canada', AU: 'Australia', FR: 'France', IT: 'Italy', ES: 'Spain', JP: 'Japan', CN: 'China', SE: 'Sweden', CH: 'Switzerland', NL: 'Netherlands', BE: 'Belgium', AT: 'Austria', DK: 'Denmark', NO: 'Norway', FI: 'Finland', IE: 'Ireland', PT: 'Portugal', PL: 'Poland', SG: 'Singapore', HK: 'Hong Kong', TW: 'Taiwan', KR: 'South Korea' };
 
 function compactNumber(raw: string): number | null {
     const normalized = raw.trim().replace(/,/g, '');

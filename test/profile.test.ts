@@ -24,6 +24,11 @@ describe('public eBay seller profile parser', () => {
         expect(parsePublicProfileText('location of the company. Extended shipping duration')).toMatchObject({ seller_country: null, seller_country_code: null });
     });
 
+    it('maps localized Chinese About locations to ISO codes', () => {
+        expect(parsePublicProfileText('所在地：美国 注册时间：2023 年 10 月 08 日')).toMatchObject({ seller_country: 'United States', seller_country_code: 'US' });
+        expect(parsePublicProfileText('所在地：瑞典 注册时间：2009 年 05 月 04 日')).toMatchObject({ seller_country: 'Sweden', seller_country_code: 'SE' });
+    });
+
     it('finds the public About tab and merges its location', () => {
         expect(findAboutUrl('<a href="/about">About eBay</a><a href="/str/store/about">About</a>', 'https://www.ebay.com/usr/seller', 'seller')).toBe('https://www.ebay.com/str/store/about');
         const primary = parsePublicProfileText('99.9% positive 18K items sold 4.5K followers');
