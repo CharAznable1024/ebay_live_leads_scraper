@@ -34,6 +34,10 @@ describe('public eBay seller profile parser', () => {
         expect(parsePublicProfileText('Standort: Schweden Mitglied seit: 2021')).toMatchObject({ seller_country: 'Sweden', seller_country_code: 'SE' });
     });
 
+    it('parses German localized seller feedback and metrics', () => {
+        expect(parsePublicProfileText('99,8% Positiv 142 Tsd. verkaufte Artikel Bewertungen der letzten 12 Monate Positiv 41.381 Neutral 62 Negativ 115 Artikel wie beschrieben 4.8 Angemessene Versandkosten 4.7 Versandzeit 4.9 Kommunikation 4.9')).toMatchObject({ items_sold: 142_000, feedback_positive_12m: 41_381, feedback_neutral_12m: 62, feedback_negative_12m: 115, rating_accurate_description: 4.8, rating_shipping_cost: 4.7, rating_shipping_speed: 4.9, rating_communication: 4.9 });
+    });
+
     it('finds the public About tab and merges its location', () => {
         expect(findAboutUrl('<a href="/about">About eBay</a><a href="/str/store/about">About</a>', 'https://www.ebay.com/usr/seller', 'seller')).toBe('https://www.ebay.com/str/store/about');
         expect(findAboutUrl('<link rel="canonical" href="https://www.ebay.com/str/luckyvaultus">', 'https://www.ebay.com/usr/luckyvaultus', 'luckyvaultus')).toBe('https://www.ebay.com/str/luckyvaultus?_tab=about');

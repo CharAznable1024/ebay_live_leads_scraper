@@ -19,15 +19,18 @@ const COUNTRY_CODES: Record<string, string> = {
 const COUNTRY_NAMES: Record<string, string> = { US: 'United States', GB: 'United Kingdom', DE: 'Germany', CA: 'Canada', AU: 'Australia', FR: 'France', IT: 'Italy', ES: 'Spain', JP: 'Japan', CN: 'China', SE: 'Sweden', CH: 'Switzerland', NL: 'Netherlands', BE: 'Belgium', AT: 'Austria', DK: 'Denmark', NO: 'Norway', FI: 'Finland', IE: 'Ireland', PT: 'Portugal', PL: 'Poland', SG: 'Singapore', HK: 'Hong Kong', TW: 'Taiwan', KR: 'South Korea' };
 
 function compactNumber(raw: string): number | null {
-    const normalized = raw.trim().replace(/,/g, '');
-    const match = normalized.match(/([\d.]+)\s*(K|M|B|万)?/i);
+    const normalized = raw.trim().replace(/\s/g, '');
+    const match = normalized.match(/([\d.,]+)\s*(K|M|B|万|Tsd\.?|Mio\.?)?/i);
     if (!match) return null;
-    const value = Number(match[1]);
+    const numeric = /^\d{1,3}(?:\.\d{3})+$/.test(match[1]) ? match[1].replace(/\./g, '') : match[1].replace(/,/g, '');
+    const value = Number(numeric);
     if (!Number.isFinite(value)) return null;
     const multiplier = match[2]?.toUpperCase() === 'K' ? 1_000
         : match[2]?.toUpperCase() === 'M' ? 1_000_000
             : match[2]?.toUpperCase() === 'B' ? 1_000_000_000
-                : match[2] === '万' ? 10_000 : 1;
+                : /^(Tsd\.?|K)$/i.test(match[2] ?? '') ? 1_000
+                    : /^Mio\.?$/i.test(match[2] ?? '') ? 1_000_000
+                        : match[2] === '万' ? 10_000 : 1;
     return Math.round(value * multiplier);
 }
 
@@ -57,21 +60,21 @@ function countryCode(location: string | null): string | null {
 /** Parses public text shown on an eBay seller profile, including localized UI. */
 export function parsePublicProfileText(bodyText: string): PublicProfileStats {
     const text = bodyText.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ');
-    const feedbackRateText = text.match(/([\d.]+)\s*%\s*(?:positive|好评率)/i)?.[1];
-    const feedbackRate = feedbackRateText ? Number(feedbackRateText) : null;
+    const feedbackRateText = text.match(/([\d.]+)\s*%\s*(?:positive|positiv|好评率)/i)?.[1];
+    const feedbackRate = feedbackRateText ? Number(feedbackRateText.replace(',', '.')) : null;
     const rawLocation = text.match(/(?:located in|location|所在地|位于|standort)\s*[:：]?\s*([^|•\n]{2,100})/i)?.[1]?.trim() ?? null;
     const locationCode = countryCode(rawLocation);
     return {
         feedback_rate: feedbackRate !== null && Number.isFinite(feedbackRate) ? feedbackRate : null,
-        feedback_score: matchNumber(text, [/(?:feedback\s*score|信用评价)\s*[:：]\s*([\d.,]+\s*[KMB万]?)/i, /feedback\s*\(([\d.,]+\s*[KMB万]?)\)/i, /([\d.,]+\s*[KMB万]?)\s+feedback\s+ratings?/i, /\(([\d.,]+\s*[KMB万]?)\)\s*[\d.]+\s*%\s*(?:positive|好评率)/i]),
-        feedback_positive_12m: matchNumber(text, [/(?:Positive|好评)\s*([\d,]+)/i]),
-        feedback_neutral_12m: matchNumber(text, [/(?:Neutral|中评)\s*([\d,]+)/i]),
-        feedback_negative_12m: matchNumber(text, [/(?:Negative|差评)\s*([\d,]+)/i]),
-        rating_accurate_description: matchDecimal(text, [/(?:Accurate description|描述准确性)\s*([\d.]+)/i]),
-        rating_shipping_cost: matchDecimal(text, [/(?:Reasonable shipping cost|合理的运费)\s*([\d.]+)/i]),
-        rating_shipping_speed: matchDecimal(text, [/(?:Shipping speed|发货速度)\s*([\d.]+)/i]),
-        rating_communication: matchDecimal(text, [/(?:Communication|沟通)\s*([\d.]+)/i]),
-        items_sold: matchNumber(text, [/([\d.,]+\s*[KMB万]?)\s*(?:items?\s*sold|件物品)/i, /(?:sold|已售出)\s*([\d.,]+\s*[KMB万]?)/i]),
+        feedback_score: matchNumber(text, [/(?:feedback\s*score|Bewertungspunkte|信用评价)\s*[:：]\s*([\d.,]+\s*[KMB万Tsd.Mio]?)/i]),
+        feedback_positive_12m: matchNumber(text, [/(?:last\s+12\s+months|letzten\s+12\s+Monate).*?(?:Positive|Positiv)\s*([\d.,]+)/i, /(?:Positive|Positiv|好评)\s*([\d.,]+)/i]),
+        feedback_neutral_12m: matchNumber(text, [/(?:Neutral|Neutralen?|中评)\s*([\d.,]+)/i]),
+        feedback_negative_12m: matchNumber(text, [/(?:Negative|Negativ|差评)\s*([\d.,]+)/i]),
+        rating_accurate_description: matchDecimal(text, [/(?:Accurate description|Artikel wie beschrieben|描述准确性)\s*([\d.]+)/i]),
+        rating_shipping_cost: matchDecimal(text, [/(?:Reasonable shipping cost|Angemessene Versandkosten|Versandkosten|合理的运费)\s*([\d.]+)/i]),
+        rating_shipping_speed: matchDecimal(text, [/(?:Shipping speed|Versandzeit|Versandgeschwindigkeit|发货速度)\s*([\d.]+)/i]),
+        rating_communication: matchDecimal(text, [/(?:Communication|Kommunikation|沟通)\s*([\d.]+)/i]),
+        items_sold: matchNumber(text, [/([\d.,]+\s*(?:K|M|B|万|Tsd\.?|Mio\.?)?)\s*(?:items?\s*sold|verkaufte\s+Artikel|Artikel\s+verkauft|件物品)/i, /(?:sold|已售出)\s*([\d.,]+\s*(?:K|M|B|万|Tsd\.?|Mio\.?)?)/i]),
         items_listed: matchNumber(text, [/(?:for sale|在售|选购)\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:items?\s*for sale|件在售)/i]),
         follower_count: matchNumber(text, [/(?:followers?|关注者)\s*([\d.,]+\s*[KMB万]?)/i, /([\d.,]+\s*[KMB万]?)\s*(?:followers?|位关注者)/i]),
         seller_country: locationCode ? COUNTRY_NAMES[locationCode] ?? rawLocation : null,

@@ -14,7 +14,7 @@ const list = (value: unknown, fallback: string[], field: string) => { const raw 
 const integer = (value: unknown, fallback: number, min: number, max: number, field: string) => { const v = value === undefined ? fallback : value; if (!Number.isInteger(v) || (v as number) < min || (v as number) > max) throw new Error(`${field} must be an integer between ${min} and ${max}`); return v as number; };
 const bool = (value: unknown, fallback: boolean, field: string) => { const v = value === undefined ? fallback : value; if (typeof v !== 'boolean') throw new Error(`${field} must be a boolean`); return v; };
 export function normalizeInput(raw: ActorInput | null | undefined): Input {
-  const data = raw ?? {}; const country = (data.country ?? 'US') as Marketplace; if (!markets.has(country)) throw new Error('Unsupported country');
+  const data = raw ?? {}; const country = (data.country ?? 'GB') as Marketplace; if (!markets.has(country)) throw new Error('Unsupported country');
   const countryFilters = list(data.sellerCountries, [], 'sellerCountries').map((v) => v.toUpperCase());
   if (countryFilters.some((v) => v !== 'EU' && !/^[A-Z]{2}$/.test(v))) throw new Error('sellerCountries must contain ISO alpha-2 codes or EU');
   const sellerCountries = [...new Set(countryFilters.flatMap((value) => value === 'EU' ? EU_COUNTRY_CODES : value))];
