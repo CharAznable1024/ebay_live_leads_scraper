@@ -62,3 +62,14 @@ export function htmlToVisibleText(html: string): string {
         .replace(/\s+/g, ' ')
         .trim();
 }
+
+export function inspectUnlockedHtml(html: string, sellerUsername: string) {
+    const visibleText = htmlToVisibleText(html);
+    return {
+        html_bytes: Buffer.byteLength(html),
+        title: html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, ' ').trim() ?? null,
+        contains_seller_username: visibleText.toLowerCase().includes(sellerUsername.toLowerCase()),
+        contains_captcha_or_error: /captcha|robot|something went wrong|access denied|verify you are human/i.test(visibleText),
+        text_preview: visibleText.slice(0, 800),
+    };
+}

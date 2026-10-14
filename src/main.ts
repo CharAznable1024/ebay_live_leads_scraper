@@ -1,7 +1,7 @@
 import { PlaywrightCrawler } from '@crawlee/playwright';
 import { Actor, log } from 'apify';
 
-import { fetchWithWebUnlocker, htmlToVisibleText } from './bright-data.js';
+import { fetchWithWebUnlocker, htmlToVisibleText, inspectUnlockedHtml } from './bright-data.js';
 import { captureGraphqlResponse, inspectGraphqlResponse, inspectLiveFeedShapes, inspectSellerProfileShapes, type GraphqlCapture } from './graphql.js';
 import { normalizeInput } from './input.js';
 import { sessionsFromEbayLiveFeed, sessionsFromJson } from './parser.js';
@@ -122,6 +122,7 @@ if (useBrightData && candidates.length) {
                     timeoutMillis: input.navigationTimeoutSecs * 1_000,
                 });
                 const stats = parsePublicProfileText(htmlToVisibleText(result.html));
+                await Actor.setValue(`UNLOCKER_DEBUG_${first.host_id}`, inspectUnlockedHtml(result.html, first.host_name ?? first.host_id));
                 profileStats.set(first.host_id, stats);
                 log.info('Enriched public eBay seller profile through Web Unlocker', {
                     hostId: first.host_id,

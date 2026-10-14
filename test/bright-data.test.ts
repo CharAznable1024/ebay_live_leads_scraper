@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fetchWithWebUnlocker, htmlToVisibleText } from '../src/bright-data.js';
+import { fetchWithWebUnlocker, htmlToVisibleText, inspectUnlockedHtml } from '../src/bright-data.js';
 
 describe('Bright Data Web Unlocker client', () => {
     it('requests rendered public HTML and unwraps the response body', async () => {
@@ -19,5 +19,11 @@ describe('Bright Data Web Unlocker client', () => {
 
     it('converts returned HTML to visible profile text', () => {
         expect(htmlToVisibleText('<style>x</style><div>99.9% positive &amp; trusted</div>')).toBe('99.9% positive & trusted');
+    });
+
+    it('creates a bounded unlock diagnostic without retaining full HTML', () => {
+        expect(inspectUnlockedHtml('<title>Seller</title><div>purecrystalhub profile</div>', 'purecrystalhub')).toMatchObject({
+            title: 'Seller', contains_seller_username: true, contains_captcha_or_error: false,
+        });
     });
 });
