@@ -4,6 +4,8 @@
   "description": "Discover public eBay Live hosts/sellers. No login or private-contact collection.",
   "type": "object", "schemaVersion": 1,
   "properties": {
+    "campaignId": { "title": "Aime campaign ID", "type": "string", "description": "Optional Campaign identifier passed through to Dataset, OUTPUT and PROGRESS.", "editor": "textfield", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$", "maxLength": 128 },
+    "shardId": { "title": "Aime shard ID", "type": "string", "description": "Optional shard identifier passed through to Dataset, OUTPUT and PROGRESS.", "editor": "textfield", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$", "maxLength": 128 },
     "searchQueries": { "title": "Live keywords", "type": "array", "description": "Optional keywords used as evidence labels for public eBay Live discovery URLs.", "editor": "stringList", "default": [], "items": { "type": "string" } },
     "startUrls": { "title": "eBay Live URLs", "type": "array", "description": "Optional public eBay Live event, channel, or browse URLs.", "editor": "requestListSources", "default": [] },
     "sellerUsernames": { "title": "Known seller usernames", "type": "array", "description": "Optional public eBay usernames to enrich directly in addition to Live discovery.", "editor": "stringList", "default": [], "items": { "type": "string" } },

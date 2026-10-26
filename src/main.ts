@@ -11,6 +11,8 @@ import type { ActorInput, Lead, LiveSession, PublicProfileStats } from './types.
 await Actor.init();
 
 const input = normalizeInput(await Actor.getInput<ActorInput>());
+const runId = process.env.APIFY_ACTOR_RUN_ID?.trim() || process.env.ACTOR_RUN_ID?.trim() || 'local';
+const datasetId = process.env.APIFY_DEFAULT_DATASET_ID?.trim() || process.env.ACTOR_DEFAULT_DATASET_ID?.trim() || 'default';
 const sessions = new Map<string, LiveSession>();
 const profileStats = new Map<string, PublicProfileStats>();
 const failedSources: string[] = [];
@@ -132,10 +134,119 @@ const candidates = countryEligibleGroups
     })
     .slice(0, input.maxProfileEnrichmentHosts);
 
+const scrapedAt = new Date().toISOString();
+const checkpointedLeads = new Map<string, Lead>();
+let profileCrawler: PlaywrightCrawler | undefined;
+let checkpointQueue = Promise.resolve();
+
+function buildLead(group: LiveSession[]): Lead {
+    const first = group[0];
+    const stats = profileStats.get(first.host_id);
+    const followerCount = (stats?.follower_count ?? Math.max(...group.map((session) => session.follower_count ?? 0))) || null;
+    const statuses = [...new Set(group.map((session) => session.status))];
+    const score = Math.min(100,
+        Math.round(Math.log10((stats?.items_sold ?? 0) + 1) * 18)
+        + Math.round(Math.log10((followerCount ?? 0) + 1) * 18)
+        + Math.min(30, group.length * 5)
+        + (statuses.includes('LIVE') ? 25 : statuses.includes('UPCOMING') ? 15 : 0),
+    );
+    return {
+        record_type: 'ebay_live_host_lead',
+        schema_version: '1.2',
+        platform: 'ebay_live',
+        campaign_id: input.campaignId,
+        shard_id: input.shardId,
+        run_id: runId,
+        seller_id: first.host_id,
+        seller_name: first.host_name,
+        seller_username: first.host_name,
+        profile_url: first.profile_url,
+        seller_country: stats?.seller_country ?? first.seller_country,
+        seller_country_code: stats?.seller_country_code ?? first.seller_country_code,
+        items_sold: stats?.items_sold ?? null,
+        items_listed: stats?.items_listed ?? null,
+        follower_count: followerCount,
+        feedback_rate: stats?.feedback_rate ?? null,
+        feedback_score: stats?.feedback_score ?? null,
+        feedback_positive_12m: stats?.feedback_positive_12m ?? null,
+        feedback_neutral_12m: stats?.feedback_neutral_12m ?? null,
+        feedback_negative_12m: stats?.feedback_negative_12m ?? null,
+        rating_accurate_description: stats?.rating_accurate_description ?? null,
+        rating_shipping_cost: stats?.rating_shipping_cost ?? null,
+        rating_shipping_speed: stats?.rating_shipping_speed ?? null,
+        rating_communication: stats?.rating_communication ?? null,
+        seller_stats_source: stats ? 'seller_profile' : 'live_event',
+        live_session_count: group.length,
+        next_live_at: group.filter((session) => session.status === 'UPCOMING').map((session) => session.starts_at).filter(Boolean).sort()[0] ?? null,
+        categories: [...new Set(group.map((session) => session.category).filter(Boolean) as string[])].slice(0, 3),
+        brands: [...new Set(group.map((session) => session.brand).filter(Boolean) as string[])],
+        sample_live_urls: [...new Set(group.map((session) => session.live_url))].slice(0, 5),
+        lead_score: score,
+        qualification: score >= 65 ? 'high' : score >= 35 ? 'medium' : 'low',
+        dedupe_status: 'new',
+        scraped_at: scrapedAt,
+    };
+}
+
+function qualifies(lead: Lead): boolean {
+    return (lead.follower_count ?? 0) >= input.minFollowerCount
+        && (!input.sellerCountries.length || (!!lead.seller_country_code && input.sellerCountries.includes(lead.seller_country_code)));
+}
+
+const output = (status: 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'ABORTED') => ({
+    status,
+    campaign_id: input.campaignId,
+    shard_id: input.shardId,
+    run_id: runId,
+    dataset_id: datasetId,
+    scanned_count: profileStats.size + failedProfiles.length,
+    qualified_count: checkpointedLeads.size,
+    next_cursor: null,
+    has_more: status !== 'SUCCEEDED' && checkpointedLeads.size < input.maxSellers,
+    discovered_sessions: sessions.size,
+    profile_enrichment_attempted: input.enrichProfiles ? candidates.length : 0,
+    profile_enrichment_provider: useBrightData ? 'bright_data_web_unlocker' : input.enrichProfiles ? 'direct_browser' : 'disabled',
+    profile_enrichment_succeeded: profileStats.size,
+    profile_enrichment_failed: failedProfiles.length,
+    profile_about_enrichment_attempted: aboutEnrichmentAttempted,
+    profile_about_enrichment_succeeded: aboutEnrichmentSucceeded,
+    profile_feedback_enrichment_attempted: feedbackEnrichmentAttempted,
+    profile_feedback_enrichment_succeeded: feedbackEnrichmentSucceeded,
+    qualified_leads: checkpointedLeads.size,
+    failed_sources: failedSources,
+    scraped_at: scrapedAt,
+});
+
+async function checkpointGroupUnsafe(group: LiveSession[]): Promise<void> {
+    if (checkpointedLeads.size >= input.maxSellers) return;
+    const lead = buildLead(group);
+    if (!qualifies(lead) || checkpointedLeads.has(lead.seller_id)) return;
+    checkpointedLeads.set(lead.seller_id, lead);
+    await Actor.pushData(lead);
+    const progress = output('RUNNING');
+    await Actor.setValue('OUTPUT', progress);
+    await Actor.setValue('PROGRESS', progress);
+    if (checkpointedLeads.size >= input.maxSellers) await profileCrawler?.autoscaledPool?.abort();
+}
+
+function checkpointGroup(group: LiveSession[]): Promise<void> {
+    const operation = checkpointQueue.then(() => checkpointGroupUnsafe(group));
+    checkpointQueue = operation.catch(() => undefined);
+    return operation;
+}
+
+Actor.on('aborting', async () => {
+    log.warning('Run is aborting; preserving checkpointed eBay Live leads.');
+    await Actor.setValue('OUTPUT', output('ABORTED'));
+    await Actor.exit();
+});
+await Actor.setValue('OUTPUT', output('RUNNING'));
+
 if (useBrightData && candidates.length) {
     let nextCandidate = 0;
     const workers = Array.from({ length: Math.min(input.maxProfileConcurrency, candidates.length) }, async () => {
         while (nextCandidate < candidates.length) {
+            if (checkpointedLeads.size >= input.maxSellers) break;
             const group = candidates[nextCandidate];
             nextCandidate += 1;
             const first = group[0];
@@ -201,6 +312,7 @@ if (useBrightData && candidates.length) {
                     }
                 }
                 profileStats.set(first.host_id, stats);
+                await checkpointGroup(group);
                 log.info('Enriched public eBay seller profile through Web Unlocker', {
                     hostId: first.host_id,
                     itemsSold: stats.items_sold,
@@ -215,7 +327,7 @@ if (useBrightData && candidates.length) {
     });
     await Promise.all(workers);
 } else if (input.enrichProfiles && candidates.length) {
-    const profileCrawler = new PlaywrightCrawler({
+    profileCrawler = new PlaywrightCrawler({
         maxConcurrency: input.maxProfileConcurrency,
         maxRequestRetries: input.maxRequestRetries,
         navigationTimeoutSecs: input.navigationTimeoutSecs,
@@ -225,6 +337,8 @@ if (useBrightData && candidates.length) {
             const hostId = String(request.userData.hostId);
             const stats = parsePublicProfileText(await page.locator('body').innerText());
             profileStats.set(hostId, stats);
+            const group = candidates.find((candidate) => candidate[0].host_id === hostId);
+            if (group) await checkpointGroup(group);
             log.info('Enriched public eBay seller profile', { hostId, itemsSold: stats.items_sold, followers: stats.follower_count, country: stats.seller_country });
         },
         failedRequestHandler: ({ request }) => { failedProfiles.push(String(request.userData.hostId)); },
@@ -236,70 +350,9 @@ if (useBrightData && candidates.length) {
     })));
 }
 
-const scrapedAt = new Date().toISOString();
-const leads: Lead[] = candidates.map((group): Lead => {
-    const first = group[0];
-    const stats = profileStats.get(first.host_id);
-    const followerCount = (stats?.follower_count ?? Math.max(...group.map((session) => session.follower_count ?? 0))) || null;
-    const statuses = [...new Set(group.map((session) => session.status))];
-    const score = Math.min(100,
-        Math.round(Math.log10((stats?.items_sold ?? 0) + 1) * 18)
-        + Math.round(Math.log10((followerCount ?? 0) + 1) * 18)
-        + Math.min(30, group.length * 5)
-        + (statuses.includes('LIVE') ? 25 : statuses.includes('UPCOMING') ? 15 : 0),
-    );
-    return {
-        record_type: 'ebay_live_host_lead',
-        schema_version: '1.2',
-        platform: 'ebay_live',
-        seller_id: first.host_id,
-        seller_name: first.host_name,
-        seller_username: first.host_name,
-        profile_url: first.profile_url,
-        seller_country: stats?.seller_country ?? first.seller_country,
-        seller_country_code: stats?.seller_country_code ?? first.seller_country_code,
-        items_sold: stats?.items_sold ?? null,
-        items_listed: stats?.items_listed ?? null,
-        follower_count: followerCount,
-        feedback_rate: stats?.feedback_rate ?? null,
-        feedback_score: stats?.feedback_score ?? null,
-        feedback_positive_12m: stats?.feedback_positive_12m ?? null,
-        feedback_neutral_12m: stats?.feedback_neutral_12m ?? null,
-        feedback_negative_12m: stats?.feedback_negative_12m ?? null,
-        rating_accurate_description: stats?.rating_accurate_description ?? null,
-        rating_shipping_cost: stats?.rating_shipping_cost ?? null,
-        rating_shipping_speed: stats?.rating_shipping_speed ?? null,
-        rating_communication: stats?.rating_communication ?? null,
-        seller_stats_source: stats ? 'seller_profile' : 'live_event',
-        live_session_count: group.length,
-        next_live_at: group.filter((session) => session.status === 'UPCOMING').map((session) => session.starts_at).filter(Boolean).sort()[0] ?? null,
-        categories: [...new Set(group.map((session) => session.category).filter(Boolean) as string[])].slice(0, 3),
-        brands: [...new Set(group.map((session) => session.brand).filter(Boolean) as string[])],
-        sample_live_urls: [...new Set(group.map((session) => session.live_url))].slice(0, 5),
-        lead_score: score,
-        qualification: score >= 65 ? 'high' : score >= 35 ? 'medium' : 'low',
-        dedupe_status: 'new',
-        scraped_at: scrapedAt,
-    };
-}).filter((lead) =>
-    (lead.follower_count ?? 0) >= input.minFollowerCount
-    && (!input.sellerCountries.length || (!!lead.seller_country_code && input.sellerCountries.includes(lead.seller_country_code))),
-).sort((left, right) => right.lead_score - left.lead_score).slice(0, input.maxSellers);
-
-await Actor.pushData(leads);
-await Actor.setValue('OUTPUT', {
-    status: failedSources.length === sources.length ? 'FAILED' : 'SUCCEEDED',
-    discovered_sessions: sessions.size,
-    profile_enrichment_attempted: input.enrichProfiles ? candidates.length : 0,
-    profile_enrichment_provider: useBrightData ? 'bright_data_web_unlocker' : input.enrichProfiles ? 'direct_browser' : 'disabled',
-    profile_enrichment_succeeded: profileStats.size,
-    profile_enrichment_failed: failedProfiles.length,
-    profile_about_enrichment_attempted: aboutEnrichmentAttempted,
-    profile_about_enrichment_succeeded: aboutEnrichmentSucceeded,
-    profile_feedback_enrichment_attempted: feedbackEnrichmentAttempted,
-    profile_feedback_enrichment_succeeded: feedbackEnrichmentSucceeded,
-    qualified_leads: leads.length,
-    failed_sources: failedSources,
-    scraped_at: scrapedAt,
-});
+for (const group of candidates) {
+    if (checkpointedLeads.size >= input.maxSellers) break;
+    await checkpointGroup(group);
+}
+await Actor.setValue('OUTPUT', output(failedSources.length === sources.length ? 'FAILED' : 'SUCCEEDED'));
 await Actor.exit();

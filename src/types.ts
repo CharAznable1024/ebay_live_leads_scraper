@@ -2,8 +2,120 @@ export type Marketplace = 'US' | 'GB' | 'DE' | 'AU' | 'CA';
 export type DedupeMode = 'all' | 'new_only' | 'new_and_updated';
 export type ProfileEnrichmentMode = 'auto' | 'direct' | 'bright_data';
 
-export interface ActorInput { searchQueries?: unknown; startUrls?: unknown; sellerUsernames?: unknown; country?: unknown; sellerCountries?: unknown; maxLiveSessions?: unknown; maxSellers?: unknown; maxProfileEnrichmentHosts?: unknown; minFollowerCount?: unknown; includeEndedLives?: unknown; enrichProfiles?: unknown; profileEnrichmentMode?: unknown; maxConcurrency?: unknown; maxProfileConcurrency?: unknown; maxRequestRetries?: unknown; navigationTimeoutSecs?: unknown; dedupeMode?: unknown; dedupeStoreName?: unknown; proxyConfiguration?: unknown; }
-export interface Input { searchQueries: string[]; startUrls: string[]; sellerUsernames: string[]; country: Marketplace; sellerCountries: string[]; maxLiveSessions: number; maxSellers: number; maxProfileEnrichmentHosts: number; minFollowerCount: number; includeEndedLives: boolean; enrichProfiles: boolean; profileEnrichmentMode: ProfileEnrichmentMode; maxConcurrency: number; maxProfileConcurrency: number; maxRequestRetries: number; navigationTimeoutSecs: number; dedupeMode: DedupeMode; dedupeStoreName: string; proxyConfiguration: Record<string, unknown>; }
-export interface LiveSession { host_id: string; host_name: string | null; profile_url: string; live_url: string; title: string | null; status: 'LIVE' | 'UPCOMING' | 'ENDED' | 'UNKNOWN'; starts_at: string | null; seller_country: string | null; seller_country_code: string | null; follower_count: number | null; category: string | null; brand: string | null; }
-export interface PublicProfileStats { feedback_rate: number | null; feedback_score: number | null; feedback_positive_12m: number | null; feedback_neutral_12m: number | null; feedback_negative_12m: number | null; rating_accurate_description: number | null; rating_shipping_cost: number | null; rating_shipping_speed: number | null; rating_communication: number | null; items_sold: number | null; items_listed: number | null; follower_count: number | null; seller_country: string | null; seller_country_code: string | null; stats_source: 'seller_profile'; }
-export interface Lead { record_type: 'ebay_live_host_lead'; schema_version: '1.2'; platform: 'ebay_live'; seller_id: string; seller_name: string | null; seller_username: string | null; profile_url: string; seller_country: string | null; seller_country_code: string | null; items_sold: number | null; items_listed: number | null; follower_count: number | null; feedback_rate: number | null; feedback_score: number | null; feedback_positive_12m: number | null; feedback_neutral_12m: number | null; feedback_negative_12m: number | null; rating_accurate_description: number | null; rating_shipping_cost: number | null; rating_shipping_speed: number | null; rating_communication: number | null; seller_stats_source: 'seller_profile' | 'live_event'; live_session_count: number; next_live_at: string | null; categories: string[]; brands: string[]; sample_live_urls: string[]; lead_score: number; qualification: 'high' | 'medium' | 'low'; dedupe_status: 'new' | 'updated' | 'seen'; scraped_at: string; }
+export interface ActorInput {
+    campaignId?: unknown;
+    shardId?: unknown;
+    searchQueries?: unknown;
+    startUrls?: unknown;
+    sellerUsernames?: unknown;
+    country?: unknown;
+    sellerCountries?: unknown;
+    maxLiveSessions?: unknown;
+    maxSellers?: unknown;
+    maxProfileEnrichmentHosts?: unknown;
+    minFollowerCount?: unknown;
+    includeEndedLives?: unknown;
+    enrichProfiles?: unknown;
+    profileEnrichmentMode?: unknown;
+    maxConcurrency?: unknown;
+    maxProfileConcurrency?: unknown;
+    maxRequestRetries?: unknown;
+    navigationTimeoutSecs?: unknown;
+    dedupeMode?: unknown;
+    dedupeStoreName?: unknown;
+    proxyConfiguration?: unknown;
+}
+
+export interface Input {
+    campaignId: string | null;
+    shardId: string | null;
+    searchQueries: string[];
+    startUrls: string[];
+    sellerUsernames: string[];
+    country: Marketplace;
+    sellerCountries: string[];
+    maxLiveSessions: number;
+    maxSellers: number;
+    maxProfileEnrichmentHosts: number;
+    minFollowerCount: number;
+    includeEndedLives: boolean;
+    enrichProfiles: boolean;
+    profileEnrichmentMode: ProfileEnrichmentMode;
+    maxConcurrency: number;
+    maxProfileConcurrency: number;
+    maxRequestRetries: number;
+    navigationTimeoutSecs: number;
+    dedupeMode: DedupeMode;
+    dedupeStoreName: string;
+    proxyConfiguration: Record<string, unknown>;
+}
+
+export interface LiveSession {
+    host_id: string;
+    host_name: string | null;
+    profile_url: string;
+    live_url: string;
+    title: string | null;
+    status: 'LIVE' | 'UPCOMING' | 'ENDED' | 'UNKNOWN';
+    starts_at: string | null;
+    seller_country: string | null;
+    seller_country_code: string | null;
+    follower_count: number | null;
+    category: string | null;
+    brand: string | null;
+}
+
+export interface PublicProfileStats {
+    feedback_rate: number | null;
+    feedback_score: number | null;
+    feedback_positive_12m: number | null;
+    feedback_neutral_12m: number | null;
+    feedback_negative_12m: number | null;
+    rating_accurate_description: number | null;
+    rating_shipping_cost: number | null;
+    rating_shipping_speed: number | null;
+    rating_communication: number | null;
+    items_sold: number | null;
+    items_listed: number | null;
+    follower_count: number | null;
+    seller_country: string | null;
+    seller_country_code: string | null;
+    stats_source: 'seller_profile';
+}
+
+export interface Lead {
+    record_type: 'ebay_live_host_lead';
+    schema_version: '1.2';
+    platform: 'ebay_live';
+    campaign_id: string | null;
+    shard_id: string | null;
+    run_id: string;
+    seller_id: string;
+    seller_name: string | null;
+    seller_username: string | null;
+    profile_url: string;
+    seller_country: string | null;
+    seller_country_code: string | null;
+    items_sold: number | null;
+    items_listed: number | null;
+    follower_count: number | null;
+    feedback_rate: number | null;
+    feedback_score: number | null;
+    feedback_positive_12m: number | null;
+    feedback_neutral_12m: number | null;
+    feedback_negative_12m: number | null;
+    rating_accurate_description: number | null;
+    rating_shipping_cost: number | null;
+    rating_shipping_speed: number | null;
+    rating_communication: number | null;
+    seller_stats_source: 'seller_profile' | 'live_event';
+    live_session_count: number;
+    next_live_at: string | null;
+    categories: string[];
+    brands: string[];
+    sample_live_urls: string[];
+    lead_score: number;
+    qualification: 'high' | 'medium' | 'low';
+    dedupe_status: 'new' | 'updated' | 'seen';
+    scraped_at: string;
+}

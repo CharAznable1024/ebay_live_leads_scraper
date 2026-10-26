@@ -1,5 +1,9 @@
 # eBay Live Lead Scraper
 
+## Aime shard tracing and timeout safety
+
+Optional `campaignId` and `shardId` inputs are copied to every Dataset row as `campaign_id` and `shard_id`. The Actor reads `run_id` and `dataset_id` from the current Apify runtime. Each qualified seller is pushed immediately after its public profile finishes, and OUTPUT/PROGRESS expose `scanned_count`, `qualified_count`, `next_cursor`, and `has_more`. If a Run times out, already checkpointed rows remain available; Aime should aggregate and deduplicate by `campaign_id + seller_id`.
+
 Custom Apify Actor for public eBay Live host and seller discovery. It outputs one `ebay_live_host_lead` per host, not one row per live session.
 
 ## Design

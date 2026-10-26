@@ -1,4 +1,6 @@
 {
+  "campaignId": "cmp_example",
+  "shardId": "shd_live_01",
   "searchQueries": [],
   "startUrls": ["https://www.ebay.com/ebaylive/"],
   "sellerUsernames": [],
