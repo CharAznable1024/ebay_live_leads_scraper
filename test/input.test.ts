@@ -3,6 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { normalizeInput } from '../src/input.js';
 
 describe('country filter input', () => {
+    it('defaults discovery and seller filtering to the United Kingdom', () => {
+        const input = normalizeInput({});
+        expect(input.country).toBe('GB');
+        expect(input.sellerCountries).toEqual(['GB']);
+        expect(input.startUrls).toEqual([]);
+    });
+
     it('expands EU into concrete member-state ISO codes', () => {
         const input = normalizeInput({ campaignId: 'cmp_100', shardId: 'shd_live_01', sellerCountries: ['EU', 'CH'] });
         expect(input.campaignId).toBe('cmp_100');
@@ -19,5 +26,14 @@ describe('country filter input', () => {
 
     it('rejects country filters that are neither ISO codes nor EU', () => {
         expect(() => normalizeInput({ sellerCountries: ['EUROPE'] })).toThrow('ISO alpha-2 codes or EU');
+    });
+
+    it('uses an explicit market as the default seller filter and accepts UK aliases', () => {
+        expect(normalizeInput({ country: 'US', sellerCountries: [] }).sellerCountries).toEqual(['US']);
+        expect(normalizeInput({ country: 'UK', sellerCountries: ['UK'] })).toMatchObject({ country: 'GB', sellerCountries: ['GB'] });
+    });
+
+    it('accepts public UK marketplace start URLs', () => {
+        expect(normalizeInput({ startUrls: ['https://www.ebay.co.uk/ebaylive'] }).startUrls).toEqual(['https://www.ebay.co.uk/ebaylive']);
     });
 });

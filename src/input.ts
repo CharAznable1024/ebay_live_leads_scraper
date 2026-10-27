@@ -37,9 +37,14 @@ const optionalIdentifier = (value: unknown, field: string): string | null => {
 
 export function normalizeInput(raw: ActorInput | null | undefined): Input {
     const data = raw ?? {};
-    const country = (data.country ?? 'GB') as Marketplace;
+    const rawCountry = data.country === 'UK' ? 'GB' : data.country;
+    const country = (rawCountry ?? 'GB') as Marketplace;
     if (!markets.has(country)) throw new Error('Unsupported country');
-    const countryFilters = list(data.sellerCountries, [], 'sellerCountries').map((value) => value.toUpperCase());
+    const requestedCountryFilters = list(data.sellerCountries, [], 'sellerCountries').map((value) => {
+        const countryCode = value.toUpperCase();
+        return countryCode === 'UK' ? 'GB' : countryCode;
+    });
+    const countryFilters = requestedCountryFilters.length ? requestedCountryFilters : [country];
     if (countryFilters.some((value) => value !== 'EU' && !/^[A-Z]{2}$/.test(value))) throw new Error('sellerCountries must contain ISO alpha-2 codes or EU');
     const sellerCountries = [...new Set(countryFilters.flatMap((value) => value === 'EU' ? EU_COUNTRY_CODES : value))];
     const dedupeMode = (data.dedupeMode ?? 'new_and_updated') as DedupeMode;
@@ -47,7 +52,7 @@ export function normalizeInput(raw: ActorInput | null | undefined): Input {
     const startUrls = list(data.startUrls, [], 'startUrls');
     for (const url of startUrls) {
         const parsed = new URL(url);
-        if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('ebay.com')) throw new Error('startUrls must be public HTTPS ebay.com URLs');
+        if (parsed.protocol !== 'https:' || !/(^|\.)ebay\.(com|co\.uk|de|com\.au|ca)$/i.test(parsed.hostname)) throw new Error('startUrls must be public HTTPS eBay marketplace URLs');
     }
     const maxSellers = integer(data.maxSellers, 50, 1, 200, 'maxSellers');
     const maxProfileEnrichmentHosts = integer(data.maxProfileEnrichmentHosts, maxSellers, 1, 200, 'maxProfileEnrichmentHosts');

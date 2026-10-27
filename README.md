@@ -15,6 +15,8 @@ Custom Apify Actor for public eBay Live host and seller discovery. It outputs on
 - Output: seller/host name, profile URL, public country, feedback rate and detailed seller ratings, sold/listed counts when published, follower count, live-session count, and up to three sampled categories/brands.
 - Country filtering: pass ISO codes in `sellerCountries` (for example `["DE", "FR"]`) or `["EU"]` for the 27 European Union member states. The Actor verifies country from the public Store About tab before emitting a filtered lead.
 
+When no country fields are supplied, the Actor starts from `https://www.ebay.co.uk/ebaylive/` and verifies that emitted sellers are from `GB`. If `country` is supplied but `sellerCountries` is empty, the selected marketplace is also used as the seller-country filter. `UK` is accepted as an alias for `GB`.
+
 When a public profile does not expose a metric, the Actor emits `null` rather than inferring it. No login or private-contact collection is used.
 
 For eBay Profile pages that return `403` to data-center browsers, configure `BRIGHT_DATA_API_KEY` as an Apify secret and optionally `BRIGHT_DATA_ZONE` (default `web_unlocker1`). With `profileEnrichmentMode: "auto"`, the Actor uses Web Unlocker only for selected Profile pages; Live discovery continues through the public eBay GraphQL feed.
