@@ -4,7 +4,7 @@ import { Actor, log } from 'apify';
 import { fetchWithWebUnlocker, htmlToVisibleText, inspectUnlockedHtml } from './bright-data.js';
 import { captureGraphqlResponse, inspectGraphqlResponse, inspectLiveFeedShapes, inspectSellerProfileShapes, type GraphqlCapture } from './graphql.js';
 import { MARKETPLACE_BASE_URLS, normalizeInput } from './input.js';
-import { sessionsFromEbayLiveFeed, sessionsFromJson } from './parser.js';
+import { sessionsFromEbayLiveFeed, sessionsFromJson, sessionsFromUnlockedHtml } from './parser.js';
 import { findAboutUrl, findFeedbackUrl, mergePublicProfileStats, parsePublicProfileText } from './profile.js';
 import type { ActorInput, Lead, LiveSession, PublicProfileStats } from './types.js';
 
@@ -71,6 +71,22 @@ const discoveryCrawler = new PlaywrightCrawler({
             ...scripts.flatMap((json) => { try { return sessionsFromJson(JSON.parse(json), request.loadedUrl ?? request.url); } catch { return []; } }),
             ...graphql.flatMap((capture) => sessionsFromEbayLiveFeed(capture.response, request.loadedUrl ?? request.url)),
         ].slice(0, input.maxLiveSessions);
+        if (!discovered.length && brightDataApiKey) {
+            try {
+                const unlocked = await fetchWithWebUnlocker(request.loadedUrl ?? request.url, {
+                    apiKey: brightDataApiKey,
+                    zone: brightDataZone,
+                    country: input.country,
+                    timeoutMillis: Math.max(90_000, input.navigationTimeoutSecs * 1_000),
+                    maxAttempts: input.maxRequestRetries + 1,
+                    render: false,
+                });
+                discovered.push(...sessionsFromUnlockedHtml(unlocked.html, request.loadedUrl ?? request.url).slice(0, input.maxLiveSessions));
+                log.info('Recovered eBay Live discovery from unlocked static HTML', { source: request.userData.source, sessions: discovered.length });
+            } catch (error) {
+                log.warning('eBay Live discovery fallback failed', { source: request.userData.source, error: String(error) });
+            }
+        }
         for (const session of discovered) {
             if (!input.includeEndedLives && session.status === 'ENDED') continue;
             sessions.set(`${session.host_id}:${session.live_url}`, session);

@@ -3,6 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { fetchWithWebUnlocker, htmlToVisibleText, inspectUnlockedHtml } from '../src/bright-data.js';
 
 describe('Bright Data Web Unlocker client', () => {
+    it('supports a static HTML discovery request', async () => {
+        let body = '';
+        const fetcher = (async (_url: RequestInfo | URL, init?: RequestInit) => { body = String(init?.body); return new Response('<html>live</html>', { status: 200 }); }) as typeof fetch;
+        await fetchWithWebUnlocker('https://www.ebay.co.uk/ebaylive/', { apiKey: 'x', zone: 'z', country: 'GB', timeoutMillis: 1_000, maxAttempts: 1, render: false }, fetcher);
+        expect(JSON.parse(body)).toMatchObject({ country: 'gb', render: 'false' });
+    });
     it('requests rendered public HTML and unwraps the response body', async () => {
         let capturedInit: RequestInit | undefined;
         const fetcher = (async (_input: RequestInfo | URL, init?: RequestInit) => {

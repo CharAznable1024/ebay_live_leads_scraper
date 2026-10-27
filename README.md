@@ -8,7 +8,7 @@ Custom Apify Actor for public eBay Live host and seller discovery. It outputs on
 
 ## Design
 
-- Discovery: public eBay Live browse, channel, and event pages.
+- Discovery: public eBay Live browse, channel, and event pages. The Actor first captures browser GraphQL responses; if none are available, it automatically unlocks the same page and parses its server-rendered Apollo state, with event-card HTML as a final fallback.
 - Aggregation: all sampled sessions for one public host are combined.
 - Qualification: optional public host-country and follower thresholds.
 - Profile enrichment: visits each selected public seller profile once to collect published feedback rate, items sold, followers, and About-page location.
@@ -19,4 +19,4 @@ When no country fields are supplied, the Actor starts from `https://www.ebay.co.
 
 When a public profile does not expose a metric, the Actor emits `null` rather than inferring it. No login or private-contact collection is used.
 
-For eBay Profile pages that return `403` to data-center browsers, configure `BRIGHT_DATA_API_KEY` as an Apify secret and optionally `BRIGHT_DATA_ZONE` (default `web_unlocker1`). With `profileEnrichmentMode: "auto"`, the Actor uses Web Unlocker only for selected Profile pages; Live discovery continues through the public eBay GraphQL feed.
+For eBay pages that return incomplete data to data-center browsers, configure `BRIGHT_DATA_API_KEY` as an Apify secret and optionally `BRIGHT_DATA_ZONE`. With `profileEnrichmentMode: "auto"`, the Actor uses Web Unlocker for selected Profile pages and automatically falls back to a static unlocked Live page when the browser does not expose the public GraphQL feed.

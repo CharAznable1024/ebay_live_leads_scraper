@@ -4,6 +4,7 @@ export interface WebUnlockerOptions {
     country: string;
     timeoutMillis: number;
     maxAttempts?: number;
+    render?: boolean;
 }
 
 export interface WebUnlockerResult {
@@ -49,7 +50,7 @@ async function fetchUnlockerOnce(targetUrl: string, options: WebUnlockerOptions,
             url: targetUrl,
             format: 'raw',
             country: options.country.toLowerCase(),
-            render: 'true',
+            render: String(options.render ?? true),
         }),
         signal: AbortSignal.timeout(options.timeoutMillis),
     });
